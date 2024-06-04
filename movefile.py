@@ -88,9 +88,10 @@ def clean_filename(filename):
             name = name.strip()
     name = re.findall(r'[a-zA-Z]+|\d+|[a-zA-Z]+', name)
     if len(name) > 2:
-        if name[-1] in ['ch', 'UCMP4', 'CHnyap2p.com','UC','mp4','CH']:
+        last_element = name[-1].lower()
+        if last_element in ['ch', 'ucmp4', 'chnyap2p.com', 'uc', 'mp4']:
             name[-1] = 'C'
-        elif name[-1] in ['UNCENSORED', 'Ump4']:
+        elif last_element in ['uncensored', 'ump4']:
             name[-1] = 'U'
 
     name = '-'.join(name)
