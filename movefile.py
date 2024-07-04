@@ -19,10 +19,10 @@ TO_REPLACE = [
 ]
 
 #record_time =86400
-record_time =3600*6
+record_time =300
 
 DELETE_FILENAME =["社區最新情報","台妹子"]
-file_extensions = [".mp4", ".srt", ".wmv"]
+file_extensions = [".mp4", ".srt", ".wmv",".jpg"]
 mp4_files = []
 # 紀錄變動文件名稱的檔案
 def log(message):
@@ -50,8 +50,45 @@ def get_files_modified_within_last_day(dir_path):
             if any(file.lower().endswith(ext) for ext in file_extensions) and (current_time - os.path.getmtime(file_path)) < record_time:
                 yield file_path
 
+def get_download_list():
+    for parent_dir in os.listdir(VIDEO_DIR):
+        parent_path = os.path.join(VIDEO_DIR, parent_dir)
+        if os.path.isdir(parent_path):
+            # 获取当前目录下的所有 MP4 文件，并按字母顺序排序
+            mp4_files = sorted([filename for filename in os.listdir(parent_path) if filename.lower().endswith(".mp4")])
+            # 自定义排序规则：按照文件名的字母顺序，然后按照文件名中的数字大小进行排序
+            mp4_files.sort(key=lambda x: (x.split('-')[0], int(''.join(filter(str.isdigit, x)))))
+            # 遍历排序后的文件列表
+            for filename in mp4_files:
+                base_name = os.path.splitext(filename)[0]
+                jpg_filename = f"{base_name}.jpg"
+                jpg_path = os.path.join(parent_path, jpg_filename)
+                mp4_path = os.path.join(parent_path, filename)
+                if os.path.exists(jpg_path):
+                    return True
+                else:
+                    return False
+
+'''def rename_files():
+    for file_path in get_files_modified_within_last_day(VIDEO_DIR):
+        print(file_path)
+        for pattern in DELETE_FILENAME:
+            if contains_keyword(file_path, pattern):
+                print(f"Removing file: {file_path}")  # For debugging purposes
+                os.remove(file_path)
+        directory, filename = os.path.split(file_path)
+        new_filename = clean_filename(filename)
+        new_file_path = os.path.join(directory, new_filename)
+        if new_file_path != file_path:  # 如果文件名确实有变化
+            log(f"重命名文件: {file_path} -> {new_file_path}")
+            shutil.move(file_path, new_file_path)'''
+
 def rename_files():
     for file_path in get_files_modified_within_last_day(VIDEO_DIR):
+        # 检查是否存在相同文件名但不同扩展名的 ".mp4" 和 ".jpg" 文件
+        if get_download_list():
+            continue  # 如果存在，则跳过当前文件，不执行重命名操作
+        
         print(file_path)
         for pattern in DELETE_FILENAME:
             if contains_keyword(file_path, pattern):
@@ -147,8 +184,11 @@ def move_and_rename_files():
     for oldfolder in oldfolder_array:
         print(oldfolder)
         if os.path.exists(oldfolder):
-            shutil.rmtree(oldfolder)
-            log(f"將 {oldfolder} 刪除")
+            try:
+                shutil.rmtree(oldfolder)
+                log(f"將 {oldfolder} 刪除")
+            except Exception as e:
+                log(f"刪除 {oldfolder} 時發生錯誤: {e}")
         else:
             log(f"目錄 {oldfolder} 不存在，無法刪除")
     
@@ -160,7 +200,11 @@ def move_and_rename_files():
             # 检查文件夹是否仅包含 @eaDir 或为空
             if not os.listdir(dir_path) or os.listdir(dir_path) == ["@eaDir"]:
                 log(f"删除空文件夹或仅包含 @eaDir 的文件夹: {dir_path}")
-                shutil.rmtree(dir_path)
+                try:
+                    shutil.rmtree(dir_path)
+                    log(f"刪除文件夾: {dir_path}")
+                except Exception as e:
+                    log(f"刪除 {dir_path} 時發生錯誤: {e}")
         
 if __name__ == "__main__":
     move_and_rename_files()
