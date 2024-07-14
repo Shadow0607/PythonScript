@@ -1,10 +1,10 @@
 import json
 import requests
 import time
-from config_reader import load_config
+from config_reader import load_NAS_config,load_log_config
 
-config = load_config()
-
+config = load_NAS_config()
+config_log =load_log_config()
 class DownloadStation:
     def __init__(self):
         self.base_url = f"http://{config['NAS_IP']}:5000/webapi"
