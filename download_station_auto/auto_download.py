@@ -10,11 +10,16 @@ from download import DownloadStation, download_specific_files
 from logger import log
 from database_manager import DatabaseManager
 from config_reader import load_NAS_config,load_log_config
+
 db_manager = DatabaseManager()
 config = load_NAS_config()
 config_log =load_log_config()
 
 connection = None
+
+def logger_message(message):
+    log(message,config_log['LOG_FOLDER'], 'auto_download')
+
 def clean_filename(filename, video_code):
     # 移除開頭的方括號內容
     filename = re.sub(r'^\[.*?\]', '', filename)
@@ -78,13 +83,12 @@ def download_video_link(link, video_code):
                                                 })
                             
                             if today_items:
-                                print(f"當天 ({current_date}) 的項目：")
+                                logger_message(f"當天 ({current_date}) 的項目：")
                                 for item in today_items:
-                                    print(f"時間: {item['time']}")
-                                    print(f"磁力哈希: {item['magnet_hash']}")
-                                    print(f"檔案名稱: {item['file_name']}")
-                                    print("---")
-                                    log(f"磁力哈希: {item['magnet_hash']}",config_log['LOG_FOLDER'], 'auto_download')
+                                    logger_message(f"時間: {item['time']}")
+                                    logger_message(f"磁力哈希: {item['magnet_hash']}")
+                                    logger_message(f"檔案名稱: {item['file_name']}")
+                                    logger_message("---")
                                     torrent_url = item['magnet_hash']
             
                                     ds = DownloadStation()
@@ -95,13 +99,13 @@ def download_video_link(link, video_code):
                                     finally:
                                         ds.logout()
                             else:
-                                print(f"沒有找到 {current_date} 的項目")
+                                logger_message(f"沒有找到 {current_date} 的項目")
                 else:
-                    print("未找到演員信息")
+                    logger_message("未找到演員信息")
             else:
-                print("未找到演員部分")
+                logger_message("未找到演員部分")
     except Exception as e:
-        log(f'Error occurred: {e}',config_log['LOG_FOLDER'], 'auto_download')
+        logger_message(f'Error occurred: {e}')
 
 def download_today_link(page):
     url = page
@@ -127,26 +131,25 @@ def download_today_link(page):
                             if video_code:
                                 video_code = video_code.text.strip()
                                 found_links.append((href, video_code))
-                                print(f"找到的鏈接: {href}, 影片編號: {video_code}")
+                                logger_message(f"找到的鏈接: {href}, 影片編號: {video_code}")
                             else:
                                 found_links.append((href, None))
-                                print(f"找到的鏈接: {href}, 未找到影片編號")
+                                logger_message(f"找到的鏈接: {href}, 未找到影片編號")
                         else:
                             found_links.append((href, None))
-                            print(f"找到的鏈接: {href}, 未找到影片標題")
+                            logger_message(f"找到的鏈接: {href}, 未找到影片標題")
             
             if not found_links:
-                print("沒有找到'今日新種'標籤")
+                logger_message("沒有找到'今日新種'標籤")
             
-            print("\n存儲的鏈接數組:")
+            logger_message("\n存儲的鏈接數組:")
             for link, code in found_links:
-                print(f"鏈接: {link}, 影片編號: {code}")
+                logger_message(f"鏈接: {link}, 影片編號: {code}")
             
             for link, code in found_links:
                 download_video_link(link, code)
     except Exception as e:
-        log(f'Error occurred: {e}')
-        print(f'Error occurred: {e}')
+        logger_message(f'Error occurred: {e}')
 
 def download_javdb_url_link():
     url_links = [
@@ -174,18 +177,18 @@ def download_javdb_url_link():
                     else:
                         page += 1
                 else:
-                    print(f"頁面 {url} 請求失敗")
+                    logger_message(f"頁面 {url} 請求失敗")
                     break
                 
             except Exception as e:
-                print(f'Error occurred on page {url}: {e}')
+                logger_message(f'Error occurred on page {url}: {e}')
                 break
 
         if found_links:
             # 如果在當前URL模板中找到了符合條件的鏈接，就不再檢查下一個URL模板
             break
 
-    print("找到的鏈接：", found_links)
+    logger_message("找到的鏈接：", found_links)
     for page in found_links:
         download_today_link(page)
         time.sleep(10)
