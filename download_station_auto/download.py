@@ -192,26 +192,6 @@ def download_specific_files(ds, torrent_url, min_size, max_size, destination, ma
     task_id = task.get("id")
     logger_message(f"找到匹配的任务，ID: {task_id}")
 
-    # 等待任务准备就绪并获取文件列表
-    start_time = time.time()
-    while time.time() - start_time < max_wait_time:
-        task_info = ds.get_task_info(task_id)
-        if task_info.get("success"):
-            task = task_info.get("data", {}).get("tasks", [{}])[0]
-            status = task.get("status")
-            files = task.get("additional", {}).get("file", [])
-
-            if status == "error":
-                logger_message(f"任务 {task_id} 出错")
-                return
-            elif status in ["downloading", "waiting", "paused"] and files:
-                logger_message(f"任务 {task_id} 已就绪，状态: {status}")
-                break
-
-        logger_message(f"任务 {task_id} 尚未就绪或文件列表为空，等待 60 秒...")
-        time.sleep(60)
-    else:
-        logger_message(f"等待任务 {task_id} 就绪或获取文件列表超时")
-        return
 
     logger_message("下载任务设置完成")
+    return
