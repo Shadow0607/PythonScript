@@ -112,7 +112,7 @@ def process_files():
 def rename_files():
     for file_path in get_recent_files(VIDEO_DIR):
         directory, filename = os.path.split(file_path)
-        print(f"Processing: directory:{directory}, filename:{filename}")
+        print(f"directory:{directory}, filename:{filename}")
         path,new_filename = clean_filename(filename)
         print(f"path:{path},filename:{new_filename}")
         if path == None:
