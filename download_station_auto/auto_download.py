@@ -17,8 +17,31 @@ config_log =load_log_config()
 
 connection = None
 
+
 def logger_message(message):
     log(message,config_log['LOG_FOLDER'], 'auto_download')
+
+connection = None
+
+def split_string(s):
+    match = re.match(r"(.*-.*)-([A-Z]*)$", s)
+    if match:
+        video_num = match.group(1)
+        category = match.group(2)
+        if category.upper() in ['UC','UCMP4']:
+            return video_num, 'UC'
+        elif category.upper() in ['C','CHNYAP2P.COM','MP4','HD','CH']:
+            return video_num, 'C'
+        elif category.upper() in ['U','UNCENSORED','UMP4']:
+            return video_num, 'U'
+        else:
+            return video_num, 'N'
+    else:
+        return s, "N"
+
+def insert_av_video(id, path):
+    video_num, category = split_string(path)
+    db_manager.insert_av_video(id, video_num, category)
 
 def clean_filename(filename, video_code):
     # 移除開頭的方括號內容
@@ -92,10 +115,11 @@ def download_video_link(link, video_code):
                                     torrent_url = item['magnet_hash']
             
                                     ds = DownloadStation()
-                                    try:
+                                    try:                                        
                                         ds.login()
                                         download_specific_files(ds, torrent_url, config['MIN_SIZE'], config['MAX_SIZE'], config['NAS_PATH'])
                                         ds.clear_completed_tasks()
+                                        insert_av_video(id,item['file_name'])
                                     finally:
                                         ds.logout()
                             else:
