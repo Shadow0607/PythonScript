@@ -41,7 +41,8 @@ def split_string(s):
 
 def insert_av_video(id, path):
     video_num, category = split_string(path)
-    db_manager.insert_av_video(id, video_num, category)
+    result = db_manager.insert_av_video(id, video_num, category)
+    return result
 
 def download_image(img_url, dir_name, file_name_without_ext):
     img_response = requests.get(img_url)
@@ -110,8 +111,10 @@ def get_download_list():
                 if os.path.exists(jpg_path):
                     pass
                 else:
-                    insert_av_video(id,base_name)
-                    download_jpg(jpg_path)
+                    if id !=0:
+                        download_jpg(jpg_path)
+                        result =insert_av_video(id,base_name)
+                        
     
 
 if __name__ == "__main__":

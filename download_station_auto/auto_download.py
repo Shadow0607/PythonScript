@@ -41,7 +41,8 @@ def split_string(s):
 
 def insert_av_video(id, path):
     video_num, category = split_string(path)
-    db_manager.insert_av_video(id, video_num, category)
+    result = db_manager.insert_av_video(id, video_num, category)
+    return result
 
 def clean_filename(filename, video_code):
     # 移除開頭的方括號內容
@@ -72,7 +73,7 @@ def download_video_link(link, video_code):
 
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, 'html.parser')
-            actor_section = soup.find('strong', text='演員:')
+            actor_section = soup.find('strong', string='演員:')
             if actor_section:
                 value_span = actor_section.find_next_sibling('span', class_='value')
                 if value_span:
@@ -116,10 +117,13 @@ def download_video_link(link, video_code):
             
                                     ds = DownloadStation()
                                     try:                                        
-                                        ds.login()
-                                        download_specific_files(ds, torrent_url, config['MIN_SIZE'], config['MAX_SIZE'], config['NAS_PATH'])
-                                        ds.clear_completed_tasks()
-                                        insert_av_video(id,item['file_name'])
+                                        result =insert_av_video(id,item['file_name'])
+                                        if result ==1:
+                                            ds.login()
+                                            download_specific_files(ds, torrent_url, config['MIN_SIZE'], config['MAX_SIZE'], config['NAS_PATH'])
+                                            ds.clear_completed_tasks()
+                                        else:
+                                            pass
                                     finally:
                                         ds.logout()
                             else:
@@ -212,7 +216,7 @@ def download_javdb_url_link():
             # 如果在當前URL模板中找到了符合條件的鏈接，就不再檢查下一個URL模板
             break
 
-    logger_message("找到的鏈接：", found_links)
+    logger_message(f"找到的鏈接：{ found_links}" )
     for page in found_links:
         download_today_link(page)
         time.sleep(10)
