@@ -14,7 +14,7 @@ config = load_NAS_config()
 config_log =load_log_config()
 
 # 設定根目錄
-root_dir = config['NAS']['PATH']
+root_dir = config['NAS_PATH']
 db_manager = DatabaseManager()
 
 def logger_message(message):
