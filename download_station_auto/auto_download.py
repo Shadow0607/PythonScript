@@ -80,52 +80,54 @@ def download_video_link(link, video_code):
                     actors = [a.text for a in value_span.find_all('a')]
                     for actor in actors:
                         id = db_manager.check_actor_id_exists(actor)
+                        logger_message(f"actor:{actor},id:{id}")
                         if id != 0:
                             today_items = []
                             items = soup.select('.item.columns')
                             for item in items:
                                 time_element = item.select_one('.time')
                                 if time_element:
-                                    item_date = datetime.strptime(time_element.text, '%Y-%m-%d').date()
-                                    if item_date == current_date:
-                                        magnet = item.select_one('a[href^="magnet:?"]')
-                                        if magnet:
-                                            magnet_link = magnet['href']
-                                            # 拆分磁力連結
-                                            magnet_parts = magnet_link.split('&', 1)
-                                            if len(magnet_parts) > 1:
-                                                magnet_hash = magnet_parts[0]
-                                                magnet_name = magnet_parts[1].split('=', 1)[-1]
-                                                
-                                                # 清理檔案名稱
-                                                clean_name = clean_filename(magnet_name, video_code)
-                                                
-                                                today_items.append({
-                                                    'time': time_element.text,
-                                                    'magnet_hash': magnet_hash,
-                                                    'file_name': clean_name
-                                                })
+                                    magnet = item.select_one('a[href^="magnet:?"]')
+                                    if magnet:
+                                        magnet_link = magnet['href']
+                                        magnet_parts = magnet_link.split('&', 1)
+                                        if len(magnet_parts) > 1:
+                                            magnet_hash = magnet_parts[0]
+                                            magnet_name = magnet_parts[1].split('=', 1)[-1]
+                                            clean_name = clean_filename(magnet_name, video_code)                         
+                                            today_items.append({
+                                                'time': datetime.strptime(time_element.text, '%Y-%m-%d'),
+                                                'magnet_hash': magnet_hash,
+                                                'file_name': clean_name
+                                            })
+                                    logger_message(f"today_items")
                             
                             if today_items:
-                                logger_message(f"當天 ({current_date}) 的項目：")
-                                for item in today_items:
-                                    logger_message(f"時間: {item['time']}")
-                                    logger_message(f"磁力哈希: {item['magnet_hash']}")
-                                    logger_message(f"檔案名稱: {item['file_name']}")
-                                    logger_message("---")
-                                    torrent_url = item['magnet_hash']
+                                # 按時間排序，最新的在前
+                                today_items.sort(key=lambda x: x['time'], reverse=True)
+                                
+                                # 只取最新的一筆
+                                latest_item = today_items[0]
+                                
+                                logger_message(f"最新的項目 ({latest_item['time'].date()})：")
+                                logger_message(f"時間: {latest_item['time']}")
+                                logger_message(f"磁力哈希: {latest_item['magnet_hash']}")
+                                logger_message(f"檔案名稱: {latest_item['file_name']}")
+                                logger_message("---")
+                                
+                                torrent_url = latest_item['magnet_hash']
             
-                                    ds = DownloadStation()
-                                    try:                                        
-                                        result =insert_av_video(id,item['file_name'])
-                                        if result ==1:
-                                            ds.login()
-                                            download_specific_files(ds, torrent_url, config['MIN_SIZE'], config['MAX_SIZE'], config['NAS_PATH'])
-                                            ds.clear_completed_tasks()
-                                        else:
-                                            pass
-                                    finally:
-                                        ds.logout()
+                                ds = DownloadStation()
+                                try:                                        
+                                    result = insert_av_video(id, latest_item['file_name'])
+                                    if result == 1:
+                                        ds.login()
+                                        download_specific_files(ds, torrent_url, config['MIN_SIZE'], config['MAX_SIZE'], config['NAS_PATH'])
+                                        ds.clear_completed_tasks()
+                                    else:
+                                        pass
+                                finally:
+                                    ds.logout()
                             else:
                                 logger_message(f"沒有找到 {current_date} 的項目")
                 else:
@@ -171,8 +173,6 @@ def download_today_link(page):
                 logger_message("沒有找到'今日新種'標籤")
             
             logger_message("\n存儲的鏈接數組:")
-            for link, code in found_links:
-                logger_message(f"鏈接: {link}, 影片編號: {code}")
             
             for link, code in found_links:
                 download_video_link(link, code)
