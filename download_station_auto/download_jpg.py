@@ -1,46 +1,25 @@
 #!/usr/bin/env python3
+import requests
 import os
 import time
-import datetime
-import requests
 from bs4 import BeautifulSoup
-import mysql.connector
-import re
-from config_reader import load_NAS_config,load_log_config,load_MYSQL_config
+from utils import process_filename, clean_filename, FILE_EXTENSIONS, VIDEO_DIR
+from config_reader import load_NAS_config, load_log_config
 from logger import log
 from database_manager import DatabaseManager
-connection = None
-config = load_NAS_config()
-config_log =load_log_config()
 
-# 設定根目錄
-root_dir = config['NAS_PATH']
+config = load_NAS_config()
+config_log = load_log_config()
 db_manager = DatabaseManager()
 
 def logger_message(message):
-    log(message,config_log['LOG_FOLDER'], 'download_jpg')
+    log(message, config_log['LOG_FOLDER'], 'download_jpg')
 
 def get_actor_id(path):
     return db_manager.get_actor_id_by_path(path)
 
-def split_string(s):
-    match = re.match(r"(.*-.*)-([A-Z]*)$", s)
-    if match:
-        video_num = match.group(1)
-        category = match.group(2)
-        if category.upper() in ['UC','UCMP4']:
-            return video_num, 'UC'
-        elif category.upper() in ['C','CHNYAP2P.COM','MP4','HD','CH']:
-            return video_num, 'C'
-        elif category.upper() in ['U','UNCENSORED','UMP4']:
-            return video_num, 'U'
-        else:
-            return video_num, 'N'
-    else:
-        return s, "N"
-
 def insert_av_video(id, path):
-    video_num, category = split_string(path)
+    video_num, category, _ = process_filename(path)
     result = db_manager.insert_av_video(id, video_num, category)
     return result
 
@@ -62,7 +41,13 @@ def download_jpg(jpg_name):
     file_name = os.path.basename(jpg_name)
     file_name_without_ext = os.path.splitext(file_name)[0]
     logger_message(f'檔名: {file_name_without_ext}')
-    parts = file_name_without_ext.split('-')
+    
+    video_num, _, is_valid = process_filename(file_name)
+    if not is_valid:
+        logger_message(f"Invalid filename: {file_name}")
+        return
+
+    parts = video_num.split('-')
     result = '-'.join(parts[:2])
     url = f'https://javdb.com/search?q={result}&f=all'
     try:
@@ -96,26 +81,48 @@ def download_jpg(jpg_name):
 
 def get_download_list():
     logger_message("DL....")
-    for parent_dir in os.listdir(root_dir):
-        parent_path = os.path.join(root_dir, parent_dir)
+    for parent_dir in os.listdir(VIDEO_DIR):
+        parent_path = os.path.join(VIDEO_DIR, parent_dir)
         if os.path.isdir(parent_path):
             id = get_actor_id(parent_path)
             logger_message(parent_path)
-            mp4_files = sorted([filename for filename in os.listdir(parent_path) if filename.lower().endswith(".mp4")])
-            mp4_files.sort(key=lambda x: (x.split('-')[0], int(''.join(filter(str.isdigit, x)))))
-            for filename in mp4_files:
-                base_name = os.path.splitext(filename)[0]
-                jpg_filename = f"{base_name}.jpg"
-                jpg_path = os.path.join(parent_path, jpg_filename)
-                mp4_path = os.path.join(parent_path, filename)
-                if os.path.exists(jpg_path):
-                    pass
+            all_files = os.listdir(parent_path)
+            if "@eaDir" in parent_path:
+                continue
+            
+            base_names = set(os.path.splitext(f)[0] for f in all_files)
+            
+            for base_name in base_names:
+                video_num, category, is_valid = process_filename(base_name + ".mp4")
+                if not is_valid:
+                    logger_message(f"Skipping invalid filename: {base_name}")
+                    continue
+                if base_name == "SYNOVIDEO_VIDEO_SCREENSHOT":
+                    continue
+                
+                mp4_exists = any(f.lower() == f"{base_name}.mp4".lower() for f in all_files)
+                jpg_exists = any(f.lower() == f"{base_name}.jpg".lower() for f in all_files)
+                
+                mp4_path = os.path.join(parent_path, f"{base_name}.mp4")
+                jpg_path = os.path.join(parent_path, f"{base_name}.jpg")
+                
+                if mp4_exists and not jpg_exists:
+                    if id != 0:
+                        result = insert_av_video(id, base_name)
+                    download_jpg(jpg_path)
+                    logger_message(f"Downloaded JPG for: {base_name}")
+                
+                elif jpg_exists and not mp4_exists:
+                    os.remove(jpg_path)
+                    logger_message(f"Deleted JPG without MP4: {jpg_path}")
+                
+                elif mp4_exists and jpg_exists:
+                    if id != 0:
+                        result = insert_av_video(id, base_name)
+                    logger_message(f"Both MP4 and JPG exist for: {base_name}")
+                
                 else:
-                    if id !=0:
-                        download_jpg(jpg_path)
-                        result =insert_av_video(id,base_name)
-                        
-    
+                    logger_message(f"Neither MP4 nor JPG exist for: {base_name}")
 
 if __name__ == "__main__":
     get_download_list()
