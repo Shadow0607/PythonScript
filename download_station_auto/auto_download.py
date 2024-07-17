@@ -9,35 +9,13 @@ import re
 from download import DownloadStation, download_specific_files
 from logger import log
 from database_manager import DatabaseManager
-from config_reader import load_NAS_config,load_log_config
-
-db_manager = DatabaseManager()
-config = load_NAS_config()
-config_log =load_log_config()
-
-connection = None
+from config_reader import load_NAS_config, load_log_config
+from utils import db_manager,config,config_log,split_string
 
 
 def logger_message(message):
-    log(message,config_log['LOG_FOLDER'], 'auto_download')
+    log(message, config_log['LOG_FOLDER'], 'auto_download')
 
-connection = None
-
-def split_string(s):
-    match = re.match(r"(.*-.*)-([A-Z]*)$", s)
-    if match:
-        video_num = match.group(1)
-        category = match.group(2)
-        if category.upper() in ['UC','UCMP4']:
-            return video_num, 'UC'
-        elif category.upper() in ['C','CHNYAP2P.COM','MP4','HD','CH']:
-            return video_num, 'C'
-        elif category.upper() in ['U','UNCENSORED','UMP4']:
-            return video_num, 'U'
-        else:
-            return video_num, 'N'
-    else:
-        return s, "N"
 
 def insert_av_video(id, path):
     video_num, category = split_string(path)
@@ -45,24 +23,15 @@ def insert_av_video(id, path):
     return result
 
 def clean_filename(filename, video_code):
-    # 移除開頭的方括號內容
     filename = re.sub(r'^\[.*?\]', '', filename)
-    
-    # 尋找影片編號在檔案名中的位置
     code_position = filename.find(video_code)
     
     if code_position != -1:
-        # 如果找到影片編號，只保留從編號開始到結尾的部分
         cleaned = filename[code_position:]
-        
-        # 移除結尾的多餘內容（如 .torrent 或其他）
         cleaned = re.sub(r'\.(?:torrent|mp4|avi|mkv).*$', '', cleaned)
-        
         return cleaned.strip()
     else:
-        # 如果沒有找到影片編號，返回原始檔名
         return filename.strip()
-
 
 def download_video_link(link, video_code):
     current_date = date.today()
@@ -103,12 +72,8 @@ def download_video_link(link, video_code):
                                     logger_message(f"today_items")
                             
                             if today_items:
-                                # 按時間排序，最新的在前
                                 today_items.sort(key=lambda x: x['time'], reverse=True)
-                                
-                                # 只取最新的一筆
                                 latest_item = today_items[0]
-                                
                                 logger_message(f"最新的項目 ({latest_item['time'].date()})：")
                                 logger_message(f"時間: {latest_item['time']}")
                                 logger_message(f"磁力哈希: {latest_item['magnet_hash']}")
@@ -116,7 +81,6 @@ def download_video_link(link, video_code):
                                 logger_message("---")
                                 
                                 torrent_url = latest_item['magnet_hash']
-            
                                 ds = DownloadStation()
                                 try:                                        
                                     result = insert_av_video(id, latest_item['file_name'])
@@ -153,10 +117,8 @@ def download_today_link(page):
                 if parent_a:
                     href = parent_a.get('href')
                     if href:
-                        # 找到包含影片標題的 div
                         title_div = parent_a.find('div', class_='video-title')
                         if title_div:
-                            # 提取 strong 標籤中的文本（影片編號）
                             video_code = title_div.find('strong')
                             if video_code:
                                 video_code = video_code.text.strip()
@@ -188,7 +150,7 @@ def download_javdb_url_link():
 
     for url_template in url_links:
         page = 1
-        max_pages = 5  # 設置一個最大頁數，以防無限循環
+        max_pages = 5
 
         while page <= max_pages:
             url = url_template.format(num=page)
@@ -213,7 +175,6 @@ def download_javdb_url_link():
                 break
 
         if found_links:
-            # 如果在當前URL模板中找到了符合條件的鏈接，就不再檢查下一個URL模板
             break
 
     logger_message(f"找到的鏈接：{ found_links}" )
@@ -221,6 +182,5 @@ def download_javdb_url_link():
         download_today_link(page)
         time.sleep(10)
 
-    
 if __name__ == "__main__":
     download_javdb_url_link()
