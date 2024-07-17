@@ -1,2 +1,3 @@
 download_station_auto/config.ini
 download_station_auto/database_manager.py
+/download_station_auto/actor_models.py
