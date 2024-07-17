@@ -1,37 +1,22 @@
-import os
 import time
 from datetime import datetime, date
 import requests
 from bs4 import BeautifulSoup
-import platform
-import mysql.connector
-import re
 from download import DownloadStation, download_specific_files
 from logger import log
-from database_manager import DatabaseManager
 from config_reader import load_NAS_config, load_log_config
-from utils import db_manager,config,config_log,split_string
+from utils import split_string, clean_filename, is_valid_filename, db_manager
 
+config = load_NAS_config()
+config_log = load_log_config()
 
 def logger_message(message):
     log(message, config_log['LOG_FOLDER'], 'auto_download')
 
-
-def insert_av_video(id, path):
-    video_num, category = split_string(path)
+def insert_av_video(id, file_name):
+    video_num, category = split_string(file_name)
     result = db_manager.insert_av_video(id, video_num, category)
     return result
-
-def clean_filename(filename, video_code):
-    filename = re.sub(r'^\[.*?\]', '', filename)
-    code_position = filename.find(video_code)
-    
-    if code_position != -1:
-        cleaned = filename[code_position:]
-        cleaned = re.sub(r'\.(?:torrent|mp4|avi|mkv).*$', '', cleaned)
-        return cleaned.strip()
-    else:
-        return filename.strip()
 
 def download_video_link(link, video_code):
     current_date = date.today()
@@ -48,9 +33,9 @@ def download_video_link(link, video_code):
                 if value_span:
                     actors = [a.text for a in value_span.find_all('a')]
                     for actor in actors:
-                        id = db_manager.check_actor_id_exists(actor)
-                        logger_message(f"actor:{actor},id:{id}")
-                        if id != 0:
+                        actor_data = db_manager.get_pure_actor_by_dynamic_value('check_ch_name', actor) or db_manager.get_pure_actor_by_dynamic_value('check_jp_name', actor)
+                        if actor_data:
+                            logger_message(f"actor:{actor},id:{actor_data['id']}")
                             today_items = []
                             items = soup.select('.item.columns')
                             for item in items:
@@ -63,13 +48,14 @@ def download_video_link(link, video_code):
                                         if len(magnet_parts) > 1:
                                             magnet_hash = magnet_parts[0]
                                             magnet_name = magnet_parts[1].split('=', 1)[-1]
-                                            clean_name = clean_filename(magnet_name, video_code)                         
-                                            today_items.append({
-                                                'time': datetime.strptime(time_element.text, '%Y-%m-%d'),
-                                                'magnet_hash': magnet_hash,
-                                                'file_name': clean_name
-                                            })
-                                    logger_message(f"today_items")
+                                            _, clean_name = clean_filename(magnet_name)
+                                            if is_valid_filename(clean_name):
+                                                today_items.append({
+                                                    'time': datetime.strptime(time_element.text, '%Y-%m-%d'),
+                                                    'magnet_hash': magnet_hash,
+                                                    'file_name': clean_name
+                                                })
+                            logger_message(f"today_items: {today_items}")
                             
                             if today_items:
                                 today_items.sort(key=lambda x: x['time'], reverse=True)
@@ -83,17 +69,19 @@ def download_video_link(link, video_code):
                                 torrent_url = latest_item['magnet_hash']
                                 ds = DownloadStation()
                                 try:                                        
-                                    result = insert_av_video(id, latest_item['file_name'])
+                                    result = insert_av_video(actor_data['id'], latest_item['file_name'])
                                     if result == 1:
                                         ds.login()
                                         download_specific_files(ds, torrent_url, config['MIN_SIZE'], config['MAX_SIZE'], config['NAS_PATH'])
                                         ds.clear_completed_tasks()
                                     else:
-                                        pass
+                                        logger_message(f"插入或更新視頻記錄失敗: {latest_item['file_name']}")
                                 finally:
                                     ds.logout()
                             else:
                                 logger_message(f"沒有找到 {current_date} 的項目")
+                        else:
+                            logger_message(f"未找到演員: {actor}")
                 else:
                     logger_message("未找到演員信息")
             else:
@@ -177,7 +165,7 @@ def download_javdb_url_link():
         if found_links:
             break
 
-    logger_message(f"找到的鏈接：{ found_links}" )
+    logger_message(f"找到的鏈接：{found_links}")
     for page in found_links:
         download_today_link(page)
         time.sleep(10)
