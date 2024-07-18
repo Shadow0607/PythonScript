@@ -187,11 +187,9 @@ def download_specific_files(ds, torrent_url, min_size, max_size, destination, ma
     if not matching_tasks:
         logger_message("无法找到匹配的新任务")
         return
-
+    
     task = matching_tasks[0]
     task_id = task.get("id")
     logger_message(f"找到匹配的任务，ID: {task_id}")
-
-
-    logger_message("下载任务设置完成")
+    ds.clear_completed_tasks()
     return

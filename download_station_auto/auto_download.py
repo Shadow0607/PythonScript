@@ -13,12 +13,41 @@ config_log = load_log_config()
 def logger_message(message):
     log(message, config_log['LOG_FOLDER'], 'auto_download')
 
-def insert_av_video(id, file_name):
+def insert_av_video(id, file_name,magnet):
     video_num, category = split_string(file_name)
-    result = db_manager.insert_av_video(id, video_num, category)
+    logger_message(f"auto_download insert_av_video id:{id}，video_num:{video_num}，category:{category}，magnet:{magnet}")
+    try:
+        result = db_manager.insert_av_video(id, video_num, category,magnet)
+    except Exception as e:
+        result =0
+        logger_message(f'Error occurred: {e}')
     return result
 
+def rename_file_by_video_code(file_name, video_code):
+    # 將文件名和 video_code 轉換為小寫以進行不區分大小寫的比較
+    file_name_lower = file_name.lower()
+    video_code_lower = video_code.lower()
+    
+    # 查找 video_code 在文件名中的位置
+    start_index = file_name_lower.find(video_code_lower)
+    
+    if start_index != -1:
+        # 如果找到 video_code，提取它和後面的部分
+        end_index = start_index + len(video_code)
+        result = file_name[start_index:end_index]
+        
+        # 檢查是否有緊跟其後的 '-X' 部分
+        if end_index < len(file_name) and file_name[end_index] == '-':
+            additional_part = file_name[end_index:].split()[0]  # 獲取下一個空格之前的部分
+            result += additional_part
+        logger_message(f"{result}")
+        return result
+    else:
+        # 如果沒有找到 video_code，返回原始的 video_code
+        return video_code
+
 def download_video_link(link, video_code):
+    logger_message(f"Link:{link}")
     current_date = date.today()
     child_url = f'https://javdb.com{link}'
     try:
@@ -48,14 +77,19 @@ def download_video_link(link, video_code):
                                         if len(magnet_parts) > 1:
                                             magnet_hash = magnet_parts[0]
                                             magnet_name = magnet_parts[1].split('=', 1)[-1]
-                                            _, clean_name = clean_filename(magnet_name)
-                                            if is_valid_filename(clean_name):
+                                            
+                                            if video_code.lower() in magnet_name.lower():
+                                                renamed_file = rename_file_by_video_code(magnet_name, video_code)
+                                                logger_message(f'magnet_name:{magnet_name},video_code:{video_code}')
+                                                #path, clean_name = clean_filename(renamed_file)
+                                                clean_name = clean_filename(renamed_file)
+                                                logger_message(f'renamed_file:{renamed_file},clean_name:{clean_name}')
                                                 today_items.append({
                                                     'time': datetime.strptime(time_element.text, '%Y-%m-%d'),
                                                     'magnet_hash': magnet_hash,
                                                     'file_name': clean_name
                                                 })
-                            logger_message(f"today_items: {today_items}")
+                            logger_message(f"Filtered and renamed today_items: {today_items}")
                             
                             if today_items:
                                 today_items.sort(key=lambda x: x['time'], reverse=True)
@@ -69,7 +103,7 @@ def download_video_link(link, video_code):
                                 torrent_url = latest_item['magnet_hash']
                                 ds = DownloadStation()
                                 try:                                        
-                                    result = insert_av_video(actor_data['id'], latest_item['file_name'])
+                                    result = insert_av_video(actor_data['id'], latest_item['file_name'],latest_item['magnet_hash'])
                                     if result == 1:
                                         ds.login()
                                         download_specific_files(ds, torrent_url, config['MIN_SIZE'], config['MAX_SIZE'], config['NAS_PATH'])
@@ -90,6 +124,7 @@ def download_video_link(link, video_code):
         logger_message(f'Error occurred: {e}')
 
 def download_today_link(page):
+    logger_message(f"page:{page}")
     url = page
     found_links = []
     try:
@@ -138,7 +173,12 @@ def download_javdb_url_link():
 
     for url_template in url_links:
         page = 1
-        max_pages = 5
+        if url_template =='https://javdb.com/censored?vft={num}':
+            page = 2
+
+        max_pages = 10  # 增加最大頁數，以確保能找到"昨日新種"
+        template_links = []
+        found_new = False
 
         while page <= max_pages:
             url = url_template.format(num=page)
@@ -149,11 +189,16 @@ def download_javdb_url_link():
                 if response.status_code == 200:
                     soup = BeautifulSoup(response.content, 'html.parser')
                     today_new_tags = soup.find_all('span', class_='tag', string='昨日新種')
-                    found_links.append(url)
+                    
+                    template_links.append(url)
+                    logger_message(f"檢查頁面: {url}")
+
                     if today_new_tags:
+                        found_new = True
+                        logger_message(f"在 {url} 找到'昨日新種'標籤")
                         break
-                    else:
-                        page += 1
+                    
+                    page += 1
                 else:
                     logger_message(f"頁面 {url} 請求失敗")
                     break
@@ -162,10 +207,13 @@ def download_javdb_url_link():
                 logger_message(f'Error occurred on page {url}: {e}')
                 break
 
-        if found_links:
-            break
+        if found_new:
+            found_links.extend(template_links)
+            logger_message(f"將 {url_template} 的鏈接添加到 found_links")
+        else:
+            logger_message(f"在 {url_template} 中未找到'昨日新種'標籤")
 
-    logger_message(f"找到的鏈接：{found_links}")
+    logger_message(f"找到的所有鏈接：{found_links}")
     for page in found_links:
         download_today_link(page)
         time.sleep(10)
