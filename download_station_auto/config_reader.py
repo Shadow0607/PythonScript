@@ -32,6 +32,15 @@ def load_log_config(config_file='config.ini'):
         'LOG_FOLDER': config['LOG']['LINUX_FOLDER'] if system == 'Linux' else config['LOG']['WINDOWS_FOLDER'],
     }
 
+def load_NAS_ROOT_config(config_file='config.ini'):
+    config = configparser.ConfigParser()
+    config_path = os.path.join(os.path.dirname(__file__), config_file)
+    # 使用 UTF-8 編碼讀取配置文件
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config.read_file(f)
+    system = platform.system()
+    return config['NAS']['PATH'] if system == 'Linux' else config['NAS']['WINDOWS_PATH']
+
 def load_MYSQL_config(config_file='config.ini'):
     config = configparser.ConfigParser()
     config_path = os.path.join(os.path.dirname(__file__), config_file)

@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from download import DownloadStation, download_specific_files
 from logger import log
 from config_reader import load_NAS_config, load_log_config
-from utils import split_string, clean_filename, is_valid_filename, db_manager
+from utils import split_string, clean_filename, db_manager
 
 config = load_NAS_config()
 config_log = load_log_config()

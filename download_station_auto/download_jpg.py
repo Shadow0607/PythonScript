@@ -7,6 +7,7 @@ from utils import process_filename, clean_filename, FILE_EXTENSIONS, VIDEO_DIR
 from config_reader import load_NAS_config, load_log_config
 from logger import log
 from database_manager import DatabaseManager
+import platform
 
 config = load_NAS_config()
 config_log = load_log_config()
@@ -81,11 +82,23 @@ def download_jpg(jpg_name):
 
 def get_download_list():
     logger_message("DL....")
+    
     for parent_dir in os.listdir(VIDEO_DIR):
         parent_path = os.path.join(VIDEO_DIR, parent_dir)
+        
         if os.path.isdir(parent_path):
-            id = get_actor_id(parent_path)
+            system = platform.system()
+            if system != 'Linux':
+                parent_path = parent_path.replace('Y:\\\\', '/volume1/video/')
+            logger_message(f"Processing path: {parent_path}") 
+            actor_data = db_manager.get_pure_actor_by_dynamic_value('chech_actor_path', parent_path)
+            if actor_data:
+                id = actor_data['id']
+            else:
+                id = 0  # or handle this case as appropriate
             logger_message(parent_path)
+            if system != 'Linux':
+                parent_path = parent_path.replace('/volume1/video/','Y:\\\\')
             all_files = os.listdir(parent_path)
             if "@eaDir" in parent_path:
                 continue

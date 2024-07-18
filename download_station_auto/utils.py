@@ -2,7 +2,7 @@
 import os
 import re
 from typing import Tuple, Optional
-from config_reader import load_NAS_config, load_log_config
+from config_reader import load_NAS_config, load_log_config,load_NAS_ROOT_config
 from database_manager import DatabaseManager
 from typing import Tuple, Optional
 from database_manager import DatabaseManager
@@ -11,7 +11,7 @@ config = load_NAS_config()
 config_log = load_log_config()
 db_manager = DatabaseManager()
 
-VIDEO_DIR = config['NAS_PATH']
+VIDEO_DIR = load_NAS_ROOT_config()
 FILE_EXTENSIONS = [".mp4", ".srt", ".wmv", ".jpg"]
 
 TO_REPLACE = [
