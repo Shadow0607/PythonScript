@@ -7,6 +7,8 @@ from database_manager import DatabaseManager
 from typing import Tuple, Optional
 from database_manager import DatabaseManager
 from logger import log
+import subprocess
+
 config = load_NAS_config()
 config_log = load_log_config()
 db_manager = DatabaseManager()
@@ -53,7 +55,9 @@ def is_valid_filename(filename: str) -> bool:
     pattern = rf'^[a-zA-Z]+-\d+(-[a-zA-Z]+)?({extensions_pattern})$'
     return bool(re.match(pattern, filename, re.IGNORECASE))
 
+
 def clean_filename(filename: str) -> Tuple[Optional[str], str]:
+
     # 移除文件擴展名
     name, ext = os.path.splitext(filename)
     
@@ -111,3 +115,30 @@ def clean_filename(filename: str) -> Tuple[Optional[str], str]:
     #    return None, filename
     # return path, new_filename
     return new_name
+
+def mount_NAS():
+    username = config['NAS_USERNAME']
+    password = config['NAS_PASSWORD']
+    nas_ip =config['NAS_IP']
+    folder = config['ROOT_FOLDER']
+    windows_path = config['WINDOWS_PATH'].rstrip('\\')
+    # 構建NAS共享地址
+    nas_share = fr"\\{nas_ip}{folder}"
+
+    # 映射網絡驅動器的命令
+    map_command = f"net use {windows_path} {nas_share} /user:{username} {password}"
+    logger_message(map_command)
+    # 執行映射命令
+    try:
+        subprocess.run(map_command, shell=True, check=True)
+        print(f"NAS共享 {nas_share} 已成功映射到驅動器 {windows_path}")
+    except subprocess.CalledProcessError as e:
+        print(f"映射失敗: {e}")
+
+def delete_NAS_connect():
+    try:
+        subprocess.run("net use Y: /delete", shell=True, check=True)
+        print("成功斷開 Y: 驅動器連接")
+    except subprocess.CalledProcessError as e:
+        print(f"斷開連接時發生錯誤: {e}")
+

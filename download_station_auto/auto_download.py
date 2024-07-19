@@ -133,7 +133,7 @@ def download_today_link(page):
 
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, 'html.parser')
-            today_new_tags = soup.find_all('span', class_='tag', string='昨日新種')
+            today_new_tags = soup.find_all('span', class_='tag', string='今日新種')
             
             for tag in today_new_tags:
                 parent_a = tag.find_parent('a')

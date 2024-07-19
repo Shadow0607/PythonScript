@@ -18,7 +18,9 @@ def load_NAS_config(config_file='config.ini'):
         'NAS_PASSWORD': config['NAS']['PASSWORD'],
         'NAS_PATH': config['NAS']['PATH'],
         'MIN_SIZE': int(config['DOWNLOAD']['MIN_SIZE']),
-        'MAX_SIZE': int(config['DOWNLOAD']['MAX_SIZE'])        
+        'MAX_SIZE': int(config['DOWNLOAD']['MAX_SIZE']),
+        'WINDOWS_PATH' :config['NAS']['WINDOWS_PATH'],
+        'ROOT_FOLDER':config['NAS']['ROOT_FOLDER']
     }
 
 def load_log_config(config_file='config.ini'):

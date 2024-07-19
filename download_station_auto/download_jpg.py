@@ -3,7 +3,7 @@ import requests
 import os
 import time
 from bs4 import BeautifulSoup
-from utils import process_filename, clean_filename, FILE_EXTENSIONS, VIDEO_DIR
+from utils import process_filename, clean_filename, FILE_EXTENSIONS, VIDEO_DIR,mount_NAS,delete_NAS_connect
 from config_reader import load_NAS_config, load_log_config
 from logger import log
 from database_manager import DatabaseManager
@@ -15,9 +15,6 @@ db_manager = DatabaseManager()
 
 def logger_message(message):
     log(message, config_log['LOG_FOLDER'], 'download_jpg')
-
-def get_actor_id(path):
-    return db_manager.get_actor_id_by_path(path)
 
 def insert_av_video(id, path):
     video_num, category, _ = process_filename(path)
@@ -82,12 +79,14 @@ def download_jpg(jpg_name):
 
 def get_download_list():
     logger_message("DL....")
-    
+    system = platform.system()
+    if system != 'Linux':
+        mount_NAS()
     for parent_dir in os.listdir(VIDEO_DIR):
         parent_path = os.path.join(VIDEO_DIR, parent_dir)
         
         if os.path.isdir(parent_path):
-            system = platform.system()
+            
             if system != 'Linux':
                 parent_path = parent_path.replace('Y:\\\\', '/volume1/video/')
             logger_message(f"Processing path: {parent_path}") 
@@ -103,7 +102,7 @@ def get_download_list():
             if "@eaDir" in parent_path:
                 continue
             
-            base_names = set(os.path.splitext(f)[0] for f in all_files)
+            base_names = set(os.path.splitext(f)[0] for f in all_files if not f.lower().endswith('.jpg'))
             
             for base_name in base_names:
                 video_num, category, is_valid = process_filename(base_name + ".mp4")
@@ -118,7 +117,7 @@ def get_download_list():
                 
                 mp4_path = os.path.join(parent_path, f"{base_name}.mp4")
                 jpg_path = os.path.join(parent_path, f"{base_name}.jpg")
-                
+                result =0
                 if mp4_exists and not jpg_exists:
                     if id != 0:
                         result = insert_av_video(id, base_name)
@@ -130,12 +129,16 @@ def get_download_list():
                     logger_message(f"Deleted JPG without MP4: {jpg_path}")
                 
                 elif mp4_exists and jpg_exists:
-                    if id != 0:
+                    if id != 0 and result==0:
                         result = insert_av_video(id, base_name)
                     logger_message(f"Both MP4 and JPG exist for: {base_name}")
                 
                 else:
                     logger_message(f"Neither MP4 nor JPG exist for: {base_name}")
+        
+    if system != 'Linux':
+        delete_NAS_connect()
+
 
 if __name__ == "__main__":
     get_download_list()
