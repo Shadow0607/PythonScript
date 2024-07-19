@@ -93,7 +93,7 @@ def clean_filename(filename: str) -> Tuple[Optional[str], str]:
         
         new_name = '-'.join(name_parts).strip().upper()
     
-    video_num, category = split_string(new_name)
+    #video_num, category = split_string(new_name)
     
     # 使用 get_pure_video_by_dynamic_value 方法獲取視頻信息
     #video_info = db_manager.get_pure_video_by_dynamic_value('check_video_num', video_num)
@@ -104,10 +104,10 @@ def clean_filename(filename: str) -> Tuple[Optional[str], str]:
     #    if actor_info:
     #        path = actor_info.get('path')
     
-    new_filename = f"{new_name}{ext}"
+    #new_filename = f"{new_name}{ext}"
     
     #if not is_valid_filename(new_filename):
     #    print(f"Error: The filename '{new_filename}' does not match the expected pattern.")
     #    return None, filename
     # return path, new_filename
-    return new_filename
+    return new_name
