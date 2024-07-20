@@ -87,10 +87,13 @@ def compare_and_keep_smaller_file(file_path, new_file_path):
             os.rename(file_path, new_file_path)
             logger_message(f"重命名後，新文件是否存在: {os.path.exists(new_file_path)}")
             logger_message(f"文件已成功重命名為: {new_file_path}")
-        else:
+        elif original_size >new_size:
             # 如果新檔案較小或相等，刪除原始檔案
             logger_message(f"保留較小的新檔案: {new_file_path}")
             os.remove(file_path)
+        else:
+            logger_message(f"大小一致，保留原始檔案: {file_path}")
+            pass
     else:
         logger_message(f"新檔案不存在，直接重命名: {os.path.exists(new_file_path)}")
         # 如果新檔案不存在，直接重命名
@@ -129,80 +132,86 @@ def process_files():
     if system != 'Linux':
         delete_NAS_connect()
 
+def get_database_root_path(dir_path):
+    linux_path = dir_path.replace('Y:', '/volume1/video/').replace('\\', '/')
+    linux_path = normalize_path(linux_path)
+    return db_manager.get_pure_actor_by_dynamic_value('check_actor_path', linux_path)
+
+def process_recent_file(file_path, filename, file_extension, database_root_path):
+    directory = os.path.dirname(file_path)
+    last_folder = os.path.basename(directory)
+    logger_message(f"目錄: {directory}")
+    logger_message(f"文件名: {filename}")
+    logger_message(f"副檔名: {file_extension}")
+    logger_message(f"最後一層資料夾: {last_folder}")
+
+    if last_folder.upper() not in filename.upper():
+        delete_file_or_folder(file_path)
+        logger_message(f"刪除不符合規則的檔案: {file_path}")
+        return
+
+    new_filename = clean_filename(filename)
+    if not new_filename:
+        delete_file_or_folder(file_path)
+        logger_message(f"刪除不符合規則的檔案: {file_path}")
+        return
+
+    video_num, category = split_string(new_filename)
+    path = db_manager.get_actor_by_video_num(video_num) or get_video_num_actor_link(video_num)
+
+    if path:
+        db_manager.insert_av_video(path['id'], video_num, category, 'N')
+        new_file_path = os.path.join(path['path'], f"{new_filename}{file_extension}")
+    else:
+        new_file_path = os.path.join(directory, f"{new_filename}{file_extension}")
+
+    if system != 'Linux':
+        new_file_path = new_file_path.replace('/volume1/video/', 'Y:').replace('/', '\\')
+
+    if new_file_path != file_path:
+        try:
+            logger_message(f"正在重命名文件: {file_path} -> {new_file_path}")
+            logger_message(f"源文件是否存在: {os.path.exists(file_path)}")
+            logger_message(f"目標路徑是否存在: {os.path.exists(os.path.dirname(new_file_path))}")
+            compare_and_keep_smaller_file(file_path, new_file_path)
+        except Exception as e:
+            logger_message(f"重命名文件 {file_path} 時出錯: {e}")
+
+def handle_database_root_file(file_path, filename, database_root_path,file_extension):
+    new_filename = clean_filename(filename)
+    video_num, category = split_string(new_filename)
+    logger_message(f"video_num:{video_num}")   
+    path = get_video_num_actor_link(video_num) or db_manager.get_actor_by_video_num(video_num)
+    logger_message(f"path:{path}")  
+    new_filename_directory=path['path']
+    logger_message(f"new_filename_directory:{new_filename_directory}，filename:{filename}")    
+    if path and path != os.path.basename(database_root_path['path']):
+        if system != 'Linux':
+            new_filename_directory = new_filename_directory.replace('/volume1/video/', 'Y:\\\\')
+        try:
+            new_filename_directory = os.path.join(new_filename_directory, f"{new_filename}{file_extension}")
+            compare_and_keep_smaller_file(file_path, new_filename_directory)
+            logger_message(f"處理數據庫根目錄文件: {file_path} -> {new_filename_directory}")
+        except Exception as e:
+            logger_message(f"處理數據庫根目錄文件 {file_path} 時出錯: {e}")
+        finally:
+            pass
+    else:
+        logger_message(f"跳過數據庫根目錄文件: {file_path}")
+    
 def rename_files():
     for file_path in get_recent_files(VIDEO_DIR):
         directory, full_filename = os.path.split(file_path)
         filename, file_extension = os.path.splitext(full_filename)
         
-        # 獲取最後一層資料夾名稱
-        last_folder = os.path.basename(directory)
-        
         dir_path = normalize_path(directory)
-        database_root_path = None
-        if system != 'Linux':
-            linux_path = dir_path.replace('Y:', '/volume1/video/').replace('\\', '/')
-            linux_path = normalize_path(linux_path)
-            database_root_path = db_manager.get_pure_actor_by_dynamic_value('check_actor_path', linux_path)
-        else :
-            database_root_path = db_manager.get_pure_actor_by_dynamic_value('check_actor_path', dir_path)
-        # 檢查最後一層資料夾是否與資料庫中的根目錄一致
-        if (database_root_path and last_folder == os.path.basename(database_root_path['path'])):
-            logger_message(f"跳過資料庫根目錄: {directory}")
-            continue
-        
-        logger_message(f"目錄: {directory}")
-        logger_message(f"文件名: {filename}")
-        logger_message(f"副檔名: {file_extension}")
-        logger_message(f"最後一層資料夾: {last_folder}")
-        logger_message(f"資料庫資料夾: {database_root_path}")
-        # 檢查文件名是否與最後一層資料夾名稱相符
-        if last_folder.upper() in filename.upper():
-            new_filename = clean_filename(filename)
-            video_num, category = split_string(new_filename)
-            
-            if new_filename is None or new_filename == '':
-                try:
-                    delete_file_or_folder(file_path)
-                    logger_message(f"刪除不符合規則的檔案: {file_path}")
-                    continue
-                except Exception as e:
-                    logger_message(f"刪除檔案:{file_path} 失敗 :{e}")
-                    continue
-            
-            if system != 'Linux':
-                directory = directory.replace('Y:', '/volume1/video/').replace('\\', '/')
-            
-            path = db_manager.get_actor_by_video_num(video_num)
-            if path is None:
-                path = get_video_num_actor_link(video_num) 
-                if path:
-                    result = db_manager.insert_av_video(path['id'], video_num, category, 'N')
-            
-            if path is None:
-                new_file_path = os.path.join(directory, new_filename + file_extension)
-            else:
-                new_file_path = os.path.join(path['path'], new_filename + file_extension)
-            
-            if system != 'Linux':
-                new_file_path = new_file_path.replace('/volume1/video/', 'Y:').replace('/', '\\')
-            
-            if new_file_path != file_path:
-                try:
-                    logger_message(f"正在重命名文件: {file_path} -> {new_file_path}")
-                    logger_message(f"源文件是否存在: {os.path.exists(file_path)}")
-                    logger_message(f"目標路徑是否存在: {os.path.exists(os.path.dirname(new_file_path))}")
-                    
-                    compare_and_keep_smaller_file(file_path, new_file_path)
-                    
-                except Exception as e:
-                    logger_message(f"重命名文件 {file_path} 時出錯: {e}")
+        database_root_path = get_database_root_path(dir_path)
+
+        last_folder = os.path.basename(directory)
+        if database_root_path and last_folder == os.path.basename(database_root_path['path']):
+            handle_database_root_file(file_path, filename, database_root_path,file_extension)
         else:
-            # 如果文件名與資料夾名不符，刪除該檔案
-            try:
-                delete_file_or_folder(file_path)
-                logger_message(f"刪除不符合規則的檔案: {file_path}")
-            except Exception as e:
-                logger_message(f"刪除檔案:{file_path} 失敗 :{e}")
+            process_recent_file(file_path, filename, file_extension, database_root_path)
 
 def clean_empty_folders(directory):
     for root, dirs, files in os.walk(directory, topdown=False):
