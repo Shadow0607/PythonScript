@@ -15,12 +15,12 @@ def logger_message(message):
 
 def insert_av_video(id, file_name,magnet):
     video_num, category = split_string(file_name)
-    logger_message(f"auto_download insert_av_video id:{id}，video_num:{video_num}，category:{category}，magnet:{magnet}")
+    #logger_message(f"auto_download insert_av_video id:{id}，video_num:{video_num}，category:{category}，magnet:{magnet}")
     try:
         result = db_manager.insert_av_video(id, video_num, category,magnet)
     except Exception as e:
         result =0
-        logger_message(f'Error occurred: {e}')
+        #logger_message(f'Error occurred: {e}')
     return result
 
 def rename_file_by_video_code(file_name, video_code):
@@ -40,14 +40,26 @@ def rename_file_by_video_code(file_name, video_code):
         if end_index < len(file_name) and file_name[end_index] == '-':
             additional_part = file_name[end_index:].split()[0]  # 獲取下一個空格之前的部分
             result += additional_part
-        logger_message(f"{result}")
         return result
     else:
         # 如果沒有找到 video_code，返回原始的 video_code
         return video_code
 
+def process_and_download_video(actor_data, latest_item, torrent_url):
+    ds = DownloadStation()
+    try:
+        result = insert_av_video(actor_data['id'], latest_item['file_name'], latest_item['magnet_hash'])
+        if result == 1:
+            ds.login()
+            download_specific_files(ds, torrent_url, config['MIN_SIZE'], config['MAX_SIZE'], config['NAS_PATH'])
+            ds.clear_completed_tasks()
+        else:
+            logger_message(f"插入或更新視頻記錄失敗: {latest_item['file_name']}")
+    finally:
+        ds.logout()
+    
 def download_video_link(link, video_code):
-    logger_message(f"Link:{link}")
+    #logger_message(f"Link:{link}")
     current_date = date.today()
     child_url = f'https://javdb.com{link}'
     try:
@@ -80,10 +92,10 @@ def download_video_link(link, video_code):
                                             
                                             if video_code.lower() in magnet_name.lower():
                                                 renamed_file = rename_file_by_video_code(magnet_name, video_code)
-                                                logger_message(f'magnet_name:{magnet_name},video_code:{video_code}')
+                                                #logger_message(f'magnet_name:{magnet_name},video_code:{video_code}')
                                                 #path, clean_name = clean_filename(renamed_file)
                                                 clean_name = clean_filename(renamed_file)
-                                                logger_message(f'renamed_file:{renamed_file},clean_name:{clean_name}')
+                                                #logger_message(f'renamed_file:{renamed_file},clean_name:{clean_name}')
                                                 today_items.append({
                                                     'time': datetime.strptime(time_element.text, '%Y-%m-%d'),
                                                     'magnet_hash': magnet_hash,
@@ -94,24 +106,14 @@ def download_video_link(link, video_code):
                             if today_items:
                                 today_items.sort(key=lambda x: x['time'], reverse=True)
                                 latest_item = today_items[0]
-                                logger_message(f"最新的項目 ({latest_item['time'].date()})：")
-                                logger_message(f"時間: {latest_item['time']}")
-                                logger_message(f"磁力哈希: {latest_item['magnet_hash']}")
-                                logger_message(f"檔案名稱: {latest_item['file_name']}")
-                                logger_message("---")
+                                #logger_message(f"最新的項目 ({latest_item['time'].date()})：")
+                                #logger_message(f"時間: {latest_item['time']}")
+                                #logger_message(f"磁力哈希: {latest_item['magnet_hash']}")
+                                #logger_message(f"檔案名稱: {latest_item['file_name']}")
+                                #logger_message("---")
                                 
                                 torrent_url = latest_item['magnet_hash']
-                                ds = DownloadStation()
-                                try:                                        
-                                    result = insert_av_video(actor_data['id'], latest_item['file_name'],latest_item['magnet_hash'])
-                                    if result == 1:
-                                        ds.login()
-                                        download_specific_files(ds, torrent_url, config['MIN_SIZE'], config['MAX_SIZE'], config['NAS_PATH'])
-                                        ds.clear_completed_tasks()
-                                    else:
-                                        logger_message(f"插入或更新視頻記錄失敗: {latest_item['file_name']}")
-                                finally:
-                                    ds.logout()
+                                process_and_download_video(actor_data, latest_item, torrent_url)
                             else:
                                 logger_message(f"沒有找到 {current_date} 的項目")
                         else:
@@ -124,7 +126,7 @@ def download_video_link(link, video_code):
         logger_message(f'Error occurred: {e}')
 
 def download_today_link(page):
-    logger_message(f"page:{page}")
+    #logger_message(f"page:{page}")
     url = page
     found_links = []
     try:
@@ -146,13 +148,13 @@ def download_today_link(page):
                             if video_code:
                                 video_code = video_code.text.strip()
                                 found_links.append((href, video_code))
-                                logger_message(f"找到的鏈接: {href}, 影片編號: {video_code}")
+                                #logger_message(f"找到的鏈接: {href}, 影片編號: {video_code}")
                             else:
                                 found_links.append((href, None))
-                                logger_message(f"找到的鏈接: {href}, 未找到影片編號")
+                               # logger_message(f"找到的鏈接: {href}, 未找到影片編號")
                         else:
                             found_links.append((href, None))
-                            logger_message(f"找到的鏈接: {href}, 未找到影片標題")
+                            #logger_message(f"找到的鏈接: {href}, 未找到影片標題")
             
             if not found_links:
                 logger_message("沒有找到'今日新種'標籤")
@@ -191,25 +193,25 @@ def download_javdb_url_link():
                     today_new_tags = soup.find_all('span', class_='tag', string='昨日新種')
                     
                     template_links.append(url)
-                    logger_message(f"檢查頁面: {url}")
+                    #logger_message(f"檢查頁面: {url}")
 
                     if today_new_tags:
                         found_new = True
-                        logger_message(f"在 {url} 找到'昨日新種'標籤")
+                        #logger_message(f"在 {url} 找到'昨日新種'標籤")
                         break
                     
                     page += 1
                 else:
-                    logger_message(f"頁面 {url} 請求失敗")
+                    #logger_message(f"頁面 {url} 請求失敗")
                     break
                 
             except Exception as e:
-                logger_message(f'Error occurred on page {url}: {e}')
+                #logger_message(f'Error occurred on page {url}: {e}')
                 break
 
         if found_new:
             found_links.extend(template_links)
-            logger_message(f"將 {url_template} 的鏈接添加到 found_links")
+            #logger_message(f"將 {url_template} 的鏈接添加到 found_links")
         else:
             logger_message(f"在 {url_template} 中未找到'昨日新種'標籤")
 
