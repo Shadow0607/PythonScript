@@ -4,10 +4,9 @@ import re
 from typing import Tuple, Optional
 from config_reader import load_NAS_config, load_log_config,load_NAS_ROOT_config
 from database_manager import DatabaseManager
-from typing import Tuple, Optional
-from database_manager import DatabaseManager
 from logger import log
 import subprocess
+import time
 
 config = load_NAS_config()
 config_log = load_log_config()
@@ -21,7 +20,7 @@ TO_REPLACE = [
     "@jnty4588.com_", "@九游@  jy", "5jy.cc-", "@江南-", "hhd800.com@", 
     "aavv38.xyz@435", "[gg5.co]", "@江南@", "jnty4588.com", "nyap2p.com",
     "aavv38.xyz@", "jn-89-9.vip", "_2K", "_4K", "_6K", "@江南@jnty4588.com", "@九游娛樂@ 5jy.cc",
-    "aavv-3-8.xyz@", "@九游@", "mp-4", "kfa11.com@", "18bt.net", "@Milan@ml2074.com_","@Milan@ty999.me_","kcf9.com"
+    "aavv-3-8.xyz@", "@九游@", "mp-4", "kfa11.com@", "18bt.net", "@Milan@ml2074.com_","@Milan@ty999.me_","kcf9.com@"
 ]
 
 
@@ -52,28 +51,29 @@ def split_string(s: str) -> Tuple[str, str]:
 
 def is_valid_filename(filename: str) -> bool:
     extensions_pattern = '|'.join([re.escape(ext) for ext in FILE_EXTENSIONS])
-    pattern = rf'^[a-zA-Z]+-\d+(-[a-zA-Z]+)?({extensions_pattern})$'
+    #pattern = rf'^[a-zA-Z]+-\d+(-[a-zA-Z]+)?({extensions_pattern})$'
+    pattern = r'^[a-zA-Z]+-\d+(-[a-zA-Z]+)?$'
     return bool(re.match(pattern, filename, re.IGNORECASE))
 
 
-def clean_filename(filename: str) -> Tuple[Optional[str], str]:
+def clean_filename(filename: str) -> str:
 
+    # 應用現有的替換模式
+    for pattern in TO_REPLACE:
+        filename = filename.replace(pattern, '')
     # 移除文件擴展名
     name, ext = os.path.splitext(filename)
     
     # 移除所有方括號及其內容
     name = re.sub(r'\[.*?\]', '', name)
     
-    # 應用現有的替換模式
-    for pattern in TO_REPLACE:
-        name = name.replace(pattern, '')
-    
     # 替換下劃線為連字符，並去除首尾空白
     name = name.replace('_', '-').strip()
     
     # 使用正則表達式提取視頻編號和類別
-    match = re.search(r'([A-Za-z]+)-?(\d+)(?:-([CUH]))?', name, re.IGNORECASE)
-    
+    #match = re.search(r'([A-Za-z]+)-?(\d+)(?:-([CUH]|UC))?', name, re.IGNORECASE)
+    match = re.search(r'([A-Za-z]+)-?(\d+)(?:-(UC|C|U|H))?', name, re.IGNORECASE)
+    logger_message(f'name:{name}，match:{match}')
     if match:
         video_code = match.group(1).upper()
         video_number = match.group(2)
@@ -95,45 +95,40 @@ def clean_filename(filename: str) -> Tuple[Optional[str], str]:
             elif last_element in ['ucmp4','uc']:
                 name_parts[-1] = 'UC'
         
-        new_name = '-'.join(name_parts).strip().upper()
+        new_name = '-'.join(name_parts[:3]).strip().upper()
     
-    #video_num, category = split_string(new_name)
-    
-    # 使用 get_pure_video_by_dynamic_value 方法獲取視頻信息
-    #video_info = db_manager.get_pure_video_by_dynamic_value('check_video_num', video_num)
-    #logger_message(f"video_info: {video_info},video_num:{video_num}")
-    #path = None
-    #if video_info:
-    #    actor_info = db_manager.get_pure_actor_by_dynamic_value('check_id', video_info['actor_id'])
-    #    if actor_info:
-    #        path = actor_info.get('path')
-    
-    #new_filename = f"{new_name}{ext}"
-    
-    #if not is_valid_filename(new_filename):
-    #    print(f"Error: The filename '{new_filename}' does not match the expected pattern.")
-    #    return None, filename
-    # return path, new_filename
     return new_name
 
 def mount_NAS():
     username = config['NAS_USERNAME']
     password = config['NAS_PASSWORD']
-    nas_ip =config['NAS_IP']
+    nas_ip = config['NAS_IP']
     folder = config['ROOT_FOLDER']
     windows_path = config['WINDOWS_PATH'].rstrip('\\')
-    # 構建NAS共享地址
     nas_share = fr"\\{nas_ip}{folder}"
 
+    # 先嘗試斷開現有連接
+    subprocess.run(f"net use {windows_path} /delete /y", shell=True, check=False)
+
     # 映射網絡驅動器的命令
-    map_command = f"net use {windows_path} {nas_share} /user:{username} {password}"
-    logger_message(map_command)
-    # 執行映射命令
-    try:
-        subprocess.run(map_command, shell=True, check=True)
-        print(f"NAS共享 {nas_share} 已成功映射到驅動器 {windows_path}")
-    except subprocess.CalledProcessError as e:
-        print(f"映射失敗: {e}")
+    map_command = f"net use {windows_path} {nas_share} /user:{username} {password} /persistent:no"
+    
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        try:
+            logger_message(f"嘗試映射 NAS 共享 (嘗試 {attempt + 1}/{max_attempts})")
+            result = subprocess.run(map_command, shell=True, check=True, capture_output=True, text=True)
+            logger_message(f"NAS 共享 {nas_share} 已成功映射到驅動器 {windows_path}")
+            return True
+        except subprocess.CalledProcessError as e:
+            logger_message(f"映射失敗 (嘗試 {attempt + 1}/{max_attempts}): {e}")
+            logger_message(f"錯誤輸出: {e.stderr}")
+            if attempt < max_attempts - 1:
+                logger_message("等待 10 秒後重試...")
+                time.sleep(10)
+    
+    logger_message("所有嘗試均失敗，無法映射 NAS 共享")
+    return False
 
 def delete_NAS_connect():
     try:
