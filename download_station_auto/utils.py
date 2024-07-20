@@ -27,11 +27,6 @@ TO_REPLACE = [
 def logger_message(message):
     log(message, config_log['LOG_FOLDER'], 'utils')
 
-def process_filename(filename: str) -> Tuple[str, str, bool]:
-    name, ext = os.path.splitext(filename)
-    video_num, category = split_string(name)
-    is_valid = is_valid_filename(filename)
-    return video_num, category, is_valid
 
 def split_string(s: str) -> Tuple[str, str]:
     match = re.match(r"(.*-.*)-([A-Z]*)$", s)
@@ -73,7 +68,7 @@ def clean_filename(filename: str) -> str:
     # 使用正則表達式提取視頻編號和類別
     #match = re.search(r'([A-Za-z]+)-?(\d+)(?:-([CUH]|UC))?', name, re.IGNORECASE)
     match = re.search(r'([A-Za-z]+)-?(\d+)(?:-(UC|C|U|H))?', name, re.IGNORECASE)
-    logger_message(f'name:{name}，match:{match}')
+    #logger_message(f'name:{name}，match:{match}')
     if match:
         video_code = match.group(1).upper()
         video_number = match.group(2)
@@ -116,9 +111,9 @@ def mount_NAS():
     max_attempts = 3
     for attempt in range(max_attempts):
         try:
-            logger_message(f"嘗試映射 NAS 共享 (嘗試 {attempt + 1}/{max_attempts})")
+            #logger_message(f"嘗試映射 NAS 共享 (嘗試 {attempt + 1}/{max_attempts})")
             result = subprocess.run(map_command, shell=True, check=True, capture_output=True, text=True)
-            logger_message(f"NAS 共享 {nas_share} 已成功映射到驅動器 {windows_path}")
+            #logger_message(f"NAS 共享 {nas_share} 已成功映射到驅動器 {windows_path}")
             return True
         except subprocess.CalledProcessError as e:
             logger_message(f"映射失敗 (嘗試 {attempt + 1}/{max_attempts}): {e}")

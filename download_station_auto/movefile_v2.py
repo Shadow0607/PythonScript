@@ -8,7 +8,7 @@ from typing import Generator
 from config_reader import load_NAS_config, load_log_config
 from logger import log
 from database_manager import DatabaseManager
-from utils import process_filename, clean_filename, FILE_EXTENSIONS, VIDEO_DIR,mount_NAS,delete_NAS_connect,split_string
+from utils import clean_filename, FILE_EXTENSIONS, VIDEO_DIR,mount_NAS,delete_NAS_connect,split_string
 import platform
 import requests
 from bs4 import BeautifulSoup
@@ -220,9 +220,9 @@ def clean_empty_folders(directory):
             dir_path = normalize_path(dir_path)
             database_root_path = None
             if "@eaDir" in dir_path:
-                logger_message(f"Skipping @eaDir root path : {dir_path}")
+                #logger_message(f"Skipping @eaDir root path : {dir_path}")
                 continue
-            logger_message(f"dir_path:{dir_path}")
+            #logger_message(f"dir_path:{dir_path}")
             # 統一處理路徑轉換
             linux_path = dir_path.replace('Y:', '/volume1/video/').replace('\\', '/')
             linux_path = normalize_path(linux_path)

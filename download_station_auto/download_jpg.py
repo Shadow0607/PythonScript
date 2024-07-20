@@ -3,7 +3,7 @@ import requests
 import os
 import time
 from bs4 import BeautifulSoup
-from utils import process_filename, clean_filename, FILE_EXTENSIONS, VIDEO_DIR,mount_NAS,delete_NAS_connect
+from utils import clean_filename, VIDEO_DIR,mount_NAS,delete_NAS_connect,split_string
 from config_reader import load_NAS_config, load_log_config
 from logger import log
 from database_manager import DatabaseManager
@@ -17,7 +17,7 @@ def logger_message(message):
     log(message, config_log['LOG_FOLDER'], 'download_jpg')
 
 def insert_av_video(id, path):
-    video_num, category, _ = process_filename(path)
+    video_num, category = split_string(path)
     result = db_manager.insert_av_video(id, video_num, category)
     return result
 
@@ -40,10 +40,7 @@ def download_jpg(jpg_name):
     file_name_without_ext = os.path.splitext(file_name)[0]
     logger_message(f'檔名: {file_name_without_ext}')
     
-    video_num, _, is_valid = process_filename(file_name)
-    if not is_valid:
-        logger_message(f"Invalid filename: {file_name}")
-        return
+    video_num= clean_filename(file_name)
 
     parts = video_num.split('-')
     result = '-'.join(parts[:2])
@@ -75,7 +72,7 @@ def download_jpg(jpg_name):
             time.sleep(5)
     except Exception as e:
         logger_message(f'Error occurred: {e}')
-    time.sleep(1)
+    time.sleep(10)
 
 def get_download_list():
     logger_message("DL....")
@@ -90,7 +87,7 @@ def get_download_list():
             if system != 'Linux':
                 parent_path = parent_path.replace('Y:\\\\', '/volume1/video/')
             logger_message(f"Processing path: {parent_path}") 
-            actor_data = db_manager.get_pure_actor_by_dynamic_value('chech_actor_path', parent_path)
+            actor_data = db_manager.get_pure_actor_by_dynamic_value('check_actor_path', parent_path)
             if actor_data:
                 id = actor_data['id']
             else:
@@ -105,10 +102,8 @@ def get_download_list():
             base_names = set(os.path.splitext(f)[0] for f in all_files if not f.lower().endswith('.jpg'))
             
             for base_name in base_names:
-                video_num, category, is_valid = process_filename(base_name + ".mp4")
-                if not is_valid:
-                    logger_message(f"Skipping invalid filename: {base_name}")
-                    continue
+                new_filename = clean_filename(base_name)
+                video_num, category = split_string(new_filename)
                 if base_name == "SYNOVIDEO_VIDEO_SCREENSHOT":
                     continue
                 
@@ -131,10 +126,8 @@ def get_download_list():
                 elif mp4_exists and jpg_exists:
                     if id != 0 and result==0:
                         result = insert_av_video(id, base_name)
-                    logger_message(f"Both MP4 and JPG exist for: {base_name}")
+                    #logger_message(f"Both MP4 and JPG exist for: {base_name}")
                 
-                else:
-                    logger_message(f"Neither MP4 nor JPG exist for: {base_name}")
         
     if system != 'Linux':
         delete_NAS_connect()
