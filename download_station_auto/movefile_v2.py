@@ -16,7 +16,7 @@ config = load_NAS_config()
 config_log = load_log_config()
 db_manager = DatabaseManager()
 
-RECORD_TIME = 3600 * 12  # 10 hours
+RECORD_TIME = 3600 * 4  # 10 hours
 system = platform.system()
 
 def logger_message(message):
@@ -140,17 +140,17 @@ def get_database_root_path(dir_path):
 def process_recent_file(file_path, filename, file_extension, database_root_path):
     directory = os.path.dirname(file_path)
     last_folder = os.path.basename(directory)
+    new_filename = clean_filename(filename)
     #logger_message(f"目錄: {directory}")
     #logger_message(f"文件名: {filename}")
     #logger_message(f"副檔名: {file_extension}")
     #logger_message(f"最後一層資料夾: {last_folder}")
 
-    if last_folder.upper() not in filename.upper():
+    if (last_folder.upper() not in new_filename.upper() and new_filename.upper() not in last_folder.upper())and last_folder != os.path.basename(database_root_path['path']):
         delete_file_or_folder(file_path)
         #logger_message(f"刪除不符合規則的檔案: {file_path}")
         return
 
-    new_filename = clean_filename(filename)
     if not new_filename:
         delete_file_or_folder(file_path)
         logger_message(f"刪除不符合規則的檔案: {file_path}")

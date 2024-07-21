@@ -130,47 +130,6 @@ def download_video_link(link, video_code):
     except Exception as e:
         logger_message(f'Error occurred: {e}')
 
-def download_today_link(page):
-    #logger_message(f"page:{page}")
-    url = page
-    found_links = []
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            today_new_tags = soup.find_all('span', class_='tag', string='今日新種')
-            
-            for tag in today_new_tags:
-                parent_a = tag.find_parent('a')
-                if parent_a:
-                    href = parent_a.get('href')
-                    if href:
-                        title_div = parent_a.find('div', class_='video-title')
-                        if title_div:
-                            video_code = title_div.find('strong')
-                            if video_code:
-                                video_code = video_code.text.strip()
-                                found_links.append((href, video_code))
-                                #logger_message(f"找到的鏈接: {href}, 影片編號: {video_code}")
-                            else:
-                                found_links.append((href, None))
-                               # logger_message(f"找到的鏈接: {href}, 未找到影片編號")
-                        else:
-                            found_links.append((href, None))
-                            #logger_message(f"找到的鏈接: {href}, 未找到影片標題")
-            
-            if not found_links:
-                logger_message("沒有找到'今日新種'標籤")
-            
-            #logger_message("\n存儲的鏈接數組:")
-            
-            for link, code in found_links:
-                download_video_link(link, code)
-    except Exception as e:
-        logger_message(f'Error occurred: {e}')
-
 def download_javdb_url_link():
     url_links = [
         'https://javdb.com/censored?page={num}',
@@ -197,6 +156,14 @@ def download_javdb_url_link():
                     soup = BeautifulSoup(response.content, 'html.parser')
                     today_new_tags = soup.find_all('span', class_='tag', string='昨日新種')
                     
+                    video_links = soup.select('a.box')
+                    for link in video_links:
+                        href = link.get('href')
+                        if href:
+                            video_code = link.select_one('div.video-title strong')
+                            if video_code:
+                                video_code = video_code.text.strip()
+                                found_links.append((href, video_code))
                     template_links.append(url)
                     #logger_message(f"檢查頁面: {url}")
 
@@ -214,16 +181,15 @@ def download_javdb_url_link():
                 #logger_message(f'Error occurred on page {url}: {e}')
                 break
 
-        if found_new:
-            found_links.extend(template_links)
+        #if found_new:
+        #    found_links.extend(template_links)
             #logger_message(f"將 {url_template} 的鏈接添加到 found_links")
-        else:
-            logger_message(f"在 {url_template} 中未找到'昨日新種'標籤")
+        #else:
+        #    logger_message(f"在 {url_template} 中未找到'昨日新種'標籤")
 
     logger_message(f"找到的所有鏈接：{found_links}")
-    for page in found_links:
-        download_today_link(page)
-        time.sleep(10)
+    for link, code in found_links:
+        download_video_link(link, code)
 
 if __name__ == "__main__":
     download_javdb_url_link()
