@@ -20,7 +20,8 @@ def load_NAS_config(config_file='config.ini'):
         'MIN_SIZE': int(config['DOWNLOAD']['MIN_SIZE']),
         'MAX_SIZE': int(config['DOWNLOAD']['MAX_SIZE']),
         'WINDOWS_PATH' :config['NAS']['WINDOWS_PATH'],
-        'ROOT_FOLDER':config['NAS']['ROOT_FOLDER']
+        'ROOT_FOLDER':config['NAS']['ROOT_FOLDER'],
+        'DB_NAME':config['NAS']['DB_NAME']
     }
 
 def load_log_config(config_file='config.ini'):
