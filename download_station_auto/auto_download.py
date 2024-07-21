@@ -65,63 +65,68 @@ def download_video_link(link, video_code):
     try:
         response = requests.get(child_url)
         response.raise_for_status()
-
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, 'html.parser')
             actor_section = soup.find('strong', string='演員:')
-            if actor_section:
-                value_span = actor_section.find_next_sibling('span', class_='value')
-                if value_span:
-                    actors = [a.text for a in value_span.find_all('a')]
-                    for actor in actors:
-                        actor_data = db_manager.get_pure_actor_by_dynamic_value('check_ch_name', actor) or db_manager.get_pure_actor_by_dynamic_value('check_jp_name', actor)
-                        if actor_data:
-                            logger_message(f"actor:{actor},id:{actor_data['id']}")
-                            today_items = []
-                            items = soup.select('.item.columns')
-                            for item in items:
-                                time_element = item.select_one('.time')
-                                if time_element:
-                                    magnet = item.select_one('a[href^="magnet:?"]')
-                                    if magnet:
-                                        magnet_link = magnet['href']
-                                        magnet_parts = magnet_link.split('&', 1)
-                                        if len(magnet_parts) > 1:
-                                            magnet_hash = magnet_parts[0]
-                                            magnet_name = magnet_parts[1].split('=', 1)[-1]
-                                            
-                                            if video_code.lower() in magnet_name.lower():
-                                                renamed_file = rename_file_by_video_code(magnet_name, video_code)
-                                                #logger_message(f'magnet_name:{magnet_name},video_code:{video_code}')
-                                                #path, clean_name = clean_filename(renamed_file)
-                                                clean_name = clean_filename(renamed_file)
-                                                #logger_message(f'renamed_file:{renamed_file},clean_name:{clean_name}')
-                                                today_items.append({
-                                                    'time': datetime.strptime(time_element.text, '%Y-%m-%d'),
-                                                    'magnet_hash': magnet_hash,
-                                                    'file_name': clean_name
-                                                })
-                            logger_message(f"Filtered and renamed today_items: {today_items}")
-                            
-                            if today_items:
-                                today_items.sort(key=lambda x: x['time'], reverse=True)
-                                latest_item = today_items[0]
-                                #logger_message(f"最新的項目 ({latest_item['time'].date()})：")
-                                #logger_message(f"時間: {latest_item['time']}")
-                                #logger_message(f"磁力哈希: {latest_item['magnet_hash']}")
-                                #logger_message(f"檔案名稱: {latest_item['file_name']}")
-                                #logger_message("---")
+            class_section =soup.find('strong', string='類別:')
+            class_value_span =class_section.find_next_sibling('span', class_='value')
+            classes = [a.text for a in class_value_span.find_all('a')]
+            if 'VR' not in classes and '介紹影片' not in classes:
+                if actor_section:
+                    value_span = actor_section.find_next_sibling('span', class_='value')
+                    if value_span:
+                        actors = [a.text for a in value_span.find_all('a')]
+                        for actor in actors:
+                            actor_data = db_manager.get_pure_actor_by_dynamic_value('check_ch_name', actor) or db_manager.get_pure_actor_by_dynamic_value('check_jp_name', actor)
+                            if actor_data:
+                                logger_message(f"actor:{actor},id:{actor_data['id']}")
+                                today_items = []
+                                items = soup.select('.item.columns')
+                                for item in items:
+                                    time_element = item.select_one('.time')
+                                    if time_element:
+                                        magnet = item.select_one('a[href^="magnet:?"]')
+                                        if magnet:
+                                            magnet_link = magnet['href']
+                                            magnet_parts = magnet_link.split('&', 1)
+                                            if len(magnet_parts) > 1:
+                                                magnet_hash = magnet_parts[0]
+                                                magnet_name = magnet_parts[1].split('=', 1)[-1]
+                                                
+                                                if video_code.lower() in magnet_name.lower():
+                                                    renamed_file = rename_file_by_video_code(magnet_name, video_code)
+                                                    #logger_message(f'magnet_name:{magnet_name},video_code:{video_code}')
+                                                    #path, clean_name = clean_filename(renamed_file)
+                                                    clean_name = clean_filename(renamed_file)
+                                                    #logger_message(f'renamed_file:{renamed_file},clean_name:{clean_name}')
+                                                    today_items.append({
+                                                        'time': datetime.strptime(time_element.text, '%Y-%m-%d'),
+                                                        'magnet_hash': magnet_hash,
+                                                        'file_name': clean_name
+                                                    })
+                                logger_message(f"Filtered and renamed today_items: {today_items}")
                                 
-                                torrent_url = latest_item['magnet_hash']
-                                process_and_download_video(actor_data, latest_item, torrent_url)
+                                if today_items:
+                                    today_items.sort(key=lambda x: x['time'], reverse=True)
+                                    latest_item = today_items[0]
+                                    #logger_message(f"最新的項目 ({latest_item['time'].date()})：")
+                                    #logger_message(f"時間: {latest_item['time']}")
+                                    #logger_message(f"磁力哈希: {latest_item['magnet_hash']}")
+                                    #logger_message(f"檔案名稱: {latest_item['file_name']}")
+                                    #logger_message("---")
+                                    
+                                    torrent_url = latest_item['magnet_hash']
+                                    process_and_download_video(actor_data, latest_item, torrent_url)
+                                else:
+                                    logger_message(f"沒有找到 {current_date} 的項目")
                             else:
-                                logger_message(f"沒有找到 {current_date} 的項目")
-                        else:
-                            logger_message(f"未找到演員: {actor}")
+                                logger_message(f"未找到演員: {actor}")
+                    else:
+                        logger_message("未找到演員信息")
                 else:
-                    logger_message("未找到演員信息")
+                    logger_message("未找到演員部分")
             else:
-                logger_message("未找到演員部分")
+                logger_message("類別中包含 VR 或介紹影片，跳過處理。")
     except Exception as e:
         logger_message(f'Error occurred: {e}')
 
@@ -159,7 +164,7 @@ def download_today_link(page):
             if not found_links:
                 logger_message("沒有找到'今日新種'標籤")
             
-            logger_message("\n存儲的鏈接數組:")
+            #logger_message("\n存儲的鏈接數組:")
             
             for link, code in found_links:
                 download_video_link(link, code)
