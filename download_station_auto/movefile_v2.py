@@ -77,15 +77,15 @@ def compare_and_keep_smaller_file(file_path, new_file_path):
         original_size = os.path.getsize(file_path)
         new_size = os.path.getsize(new_file_path)
         
-        logger_message(f"原始檔案大小: {original_size}, 新檔案大小: {new_size}")
+        #logger_message(f"原始檔案大小: {original_size}, 新檔案大小: {new_size}")
         
         if original_size < new_size:
             # 如果原始檔案較小，刪除新檔案並重命名原始檔案
             
-            logger_message(f"保留較小的原始檔案: {file_path}")
+            #logger_message(f"保留較小的原始檔案: {file_path}")
             os.remove(new_file_path)
             os.rename(file_path, new_file_path)
-            logger_message(f"重命名後，新文件是否存在: {os.path.exists(new_file_path)}")
+            #logger_message(f"重命名後，新文件是否存在: {os.path.exists(new_file_path)}")
             logger_message(f"文件已成功重命名為: {new_file_path}")
         elif original_size >new_size:
             # 如果新檔案較小或相等，刪除原始檔案
@@ -117,7 +117,7 @@ def download_video_link(link, video_code):
                     for actor in actors:
                         actor_data = db_manager.get_pure_actor_by_dynamic_value('check_ch_name', actor) or db_manager.get_pure_actor_by_dynamic_value('check_jp_name', actor)
                         if actor_data:
-                            logger_message(f"actor:{actor_data}")
+                            #logger_message(f"actor:{actor_data}")
                             return actor_data
                             
     except Exception as e:
@@ -140,14 +140,14 @@ def get_database_root_path(dir_path):
 def process_recent_file(file_path, filename, file_extension, database_root_path):
     directory = os.path.dirname(file_path)
     last_folder = os.path.basename(directory)
-    logger_message(f"目錄: {directory}")
-    logger_message(f"文件名: {filename}")
-    logger_message(f"副檔名: {file_extension}")
-    logger_message(f"最後一層資料夾: {last_folder}")
+    #logger_message(f"目錄: {directory}")
+    #logger_message(f"文件名: {filename}")
+    #logger_message(f"副檔名: {file_extension}")
+    #logger_message(f"最後一層資料夾: {last_folder}")
 
     if last_folder.upper() not in filename.upper():
         delete_file_or_folder(file_path)
-        logger_message(f"刪除不符合規則的檔案: {file_path}")
+        #logger_message(f"刪除不符合規則的檔案: {file_path}")
         return
 
     new_filename = clean_filename(filename)
@@ -170,9 +170,9 @@ def process_recent_file(file_path, filename, file_extension, database_root_path)
 
     if new_file_path != file_path:
         try:
-            logger_message(f"正在重命名文件: {file_path} -> {new_file_path}")
-            logger_message(f"源文件是否存在: {os.path.exists(file_path)}")
-            logger_message(f"目標路徑是否存在: {os.path.exists(os.path.dirname(new_file_path))}")
+            #logger_message(f"正在重命名文件: {file_path} -> {new_file_path}")
+            #logger_message(f"源文件是否存在: {os.path.exists(file_path)}")
+            #logger_message(f"目標路徑是否存在: {os.path.exists(os.path.dirname(new_file_path))}")
             compare_and_keep_smaller_file(file_path, new_file_path)
         except Exception as e:
             logger_message(f"重命名文件 {file_path} 時出錯: {e}")
@@ -182,9 +182,9 @@ def handle_database_root_file(file_path, filename, database_root_path,file_exten
     video_num, category = split_string(new_filename)
     logger_message(f"video_num:{video_num}")   
     path = get_video_num_actor_link(video_num) or db_manager.get_actor_by_video_num(video_num)
-    logger_message(f"path:{path}")  
+    #logger_message(f"path:{path}")  
     new_filename_directory=path['path']
-    logger_message(f"new_filename_directory:{new_filename_directory}，filename:{filename}")    
+    #logger_message(f"new_filename_directory:{new_filename_directory}，filename:{filename}")    
     if path and path != os.path.basename(database_root_path['path']):
         if system != 'Linux':
             new_filename_directory = new_filename_directory.replace('/volume1/video/', 'Y:\\\\')
@@ -235,7 +235,7 @@ def clean_empty_folders(directory):
                 if normalize_path(linux_path) == normalize_path(database_root_path['path']):
                     continue
                 else:
-                    logger_message(f"Skipping database root path: {dir_path}")
+                    #logger_message(f"Skipping database root path: {dir_path}")
                     continue
 
             # 處理只包含 @eaDir 的資料夾
@@ -243,7 +243,7 @@ def clean_empty_folders(directory):
                 try:
                     shutil.rmtree(os.path.join(dir_path, "@eaDir"))
                     os.rmdir(dir_path)
-                    logger_message(f"Deleted folder with only @eaDir: {dir_path}")
+                    #logger_message(f"Deleted folder with only @eaDir: {dir_path}")
                     #print(f"Deleted folder with only @eaDir: {dir_path}")
                 except Exception as e:
                     logger_message(f"Error deleting folder {dir_path}: {e}")
@@ -252,7 +252,7 @@ def clean_empty_folders(directory):
             elif not os.listdir(dir_path):
                 try:
                     delete_file_or_folder(dir_path)
-                    logger_message(f"Deleted empty folder: {dir_path}")
+                    #logger_message(f"Deleted empty folder: {dir_path}")
                     #print(f"Deleted empty folder: {dir_path}")
                 except Exception as e:
                     logger_message(f"Error deleting empty folder {dir_path}: {e}")
