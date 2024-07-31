@@ -7,16 +7,14 @@ import time
 from typing import Generator
 from config_reader import load_NAS_config, load_log_config
 from logger import log
-from database_manager import DatabaseManager
-from utils import clean_filename, FILE_EXTENSIONS, VIDEO_DIR,mount_NAS,delete_NAS_connect,split_string
+from utils import clean_filename, FILE_EXTENSIONS, VIDEO_DIR,mount_NAS,delete_NAS_connect,split_string,db_manager
 import platform
 import requests
 from bs4 import BeautifulSoup
 config = load_NAS_config()
 config_log = load_log_config()
-db_manager = DatabaseManager()
 
-RECORD_TIME = 3600 * 4  # 10 hours
+RECORD_TIME = 60*10 
 system = platform.system()
 
 def logger_message(message):

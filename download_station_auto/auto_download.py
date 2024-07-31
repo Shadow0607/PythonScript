@@ -71,7 +71,7 @@ def download_video_link(link, video_code):
             class_section =soup.find('strong', string='類別:')
             class_value_span =class_section.find_next_sibling('span', class_='value')
             classes = [a.text for a in class_value_span.find_all('a')]
-            if 'VR' not in classes and '介紹影片' not in classes:
+            if 'VR' not in classes and '介紹影片' not in classes and '4小時以上作品' not in classes:
                 if actor_section:
                     value_span = actor_section.find_next_sibling('span', class_='value')
                     if value_span:
