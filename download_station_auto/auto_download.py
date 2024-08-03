@@ -6,21 +6,37 @@ from download import DownloadStation, download_specific_files
 from logger import log
 from config_reader import load_NAS_config, load_log_config
 from utils import split_string, clean_filename, db_manager
-
+from javdb_scraper import JavdbScraper
+from actor_models import create_video_from_dict
 config = load_NAS_config()
 config_log = load_log_config()
-
+scraper = JavdbScraper()
 def logger_message(message):
     log(message, config_log['LOG_FOLDER'], 'auto_download')
 
 def insert_av_video(id, file_name,magnet):
     video_num, category = split_string(file_name)
-    #logger_message(f"auto_download insert_av_video id:{id}，video_num:{video_num}，category:{category}，magnet:{magnet}")
+    result =0
     try:
-        result = db_manager.insert_av_video(id, video_num, category,magnet)
+        check_result = db_manager.check_and_update_video(id, video_num, category,magnet)
+        if check_result:
+            existing_video = create_video_from_dict(check_result) 
+            new_priority = db_manager.get_category_priority(category)
+            existing_priority = db_manager.get_category_priority(existing_video.category)
+            logger_message(f"existing_video :{existing_video}，magnet :{magnet}")
+            if existing_video.magnet!=magnet and magnet!='N':
+                if new_priority > existing_priority:
+                    result = db_manager.update_av_video(video_num, id, category)
+                else:
+                    logger_message(f"Cannot update '{video_num}'. New category '{category}' does not have higher priority than existing '{existing_video.category}'.")
+                    result =2
+            else:
+                result =3
+        else:
+            result = db_manager.insert_av_video(id, video_num, category,magnet)
     except Exception as e:
+        logger_message(f"Exception :{e}")
         result =0
-        #logger_message(f'Error occurred: {e}')
     return result
 
 def rename_file_by_video_code(file_name, video_code):
@@ -48,99 +64,46 @@ def rename_file_by_video_code(file_name, video_code):
 def process_and_download_video(actor_data, latest_item, torrent_url):
     ds = DownloadStation()
     try:
-        result = insert_av_video(actor_data['id'], latest_item['file_name'], latest_item['magnet_hash'])
+        result = insert_av_video(actor_data['id'], latest_item, torrent_url)
         if result == 1:
+            logger_message(f"插入或更新成功: {latest_item}")
             ds.login()
             download_specific_files(ds, torrent_url, config['MIN_SIZE'], config['MAX_SIZE'], config['NAS_PATH'])
             ds.clear_completed_tasks()
-        else:
-            logger_message(f"插入或更新視頻記錄失敗: {latest_item['file_name']}")
+        elif result == 0:
+            logger_message(f"新增失敗: {latest_item}")
+        elif result == 2:
+            logger_message(f"更新失敗: {latest_item}")
+        elif result == 3:
+            logger_message(f"更新失敗，連結相同: {latest_item}")
     finally:
         ds.logout()
     
 def download_video_link(link, video_code):
-    #logger_message(f"Link:{link}")
-    current_date = date.today()
-    child_url = f'https://javdb.com{link}'
+    video_info = scraper.get_video_info(link)
     try:
-        response = requests.get(child_url)
-        response.raise_for_status()
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            actor_section = soup.find('strong', string='演員:')
-            class_section =soup.find('strong', string='類別:')
-            class_value_span =class_section.find_next_sibling('span', class_='value')
-            classes = [a.text for a in class_value_span.find_all('a')]
-            if 'VR' not in classes and '介紹影片' not in classes and '4小時以上作品' not in classes:
-                if actor_section:
-                    value_span = actor_section.find_next_sibling('span', class_='value')
-                    if value_span:
-                        actors = [a.text for a in value_span.find_all('a')]
-                        for actor in actors:
-                            actor_data = db_manager.get_pure_actor_by_dynamic_value('check_ch_name', actor) or db_manager.get_pure_actor_by_dynamic_value('check_jp_name', actor)
-                            if actor_data:
-                                logger_message(f"actor:{actor},id:{actor_data['id']}")
-                                today_items = []
-                                items = soup.select('.item.columns')
-                                for item in items:
-                                    time_element = item.select_one('.time')
-                                    if time_element:
-                                        magnet = item.select_one('a[href^="magnet:?"]')
-                                        if magnet:
-                                            magnet_link = magnet['href']
-                                            magnet_parts = magnet_link.split('&', 1)
-                                            if len(magnet_parts) > 1:
-                                                magnet_hash = magnet_parts[0]
-                                                magnet_name = magnet_parts[1].split('=', 1)[-1]
-                                                
-                                                if video_code.lower() in magnet_name.lower():
-                                                    renamed_file = rename_file_by_video_code(magnet_name, video_code)
-                                                    #logger_message(f'magnet_name:{magnet_name},video_code:{video_code}')
-                                                    #path, clean_name = clean_filename(renamed_file)
-                                                    clean_name = clean_filename(renamed_file)
-                                                    #logger_message(f'renamed_file:{renamed_file},clean_name:{clean_name}')
-                                                    today_items.append({
-                                                        'time': datetime.strptime(time_element.text, '%Y-%m-%d'),
-                                                        'magnet_hash': magnet_hash,
-                                                        'file_name': clean_name
-                                                    })
-                                logger_message(f"Filtered and renamed today_items: {today_items}")
-                                
-                                if today_items:
-                                    today_items.sort(key=lambda x: x['time'], reverse=True)
-                                    latest_item = today_items[0]
-                                    #logger_message(f"最新的項目 ({latest_item['time'].date()})：")
-                                    #logger_message(f"時間: {latest_item['time']}")
-                                    #logger_message(f"磁力哈希: {latest_item['magnet_hash']}")
-                                    #logger_message(f"檔案名稱: {latest_item['file_name']}")
-                                    #logger_message("---")
-                                    
-                                    torrent_url = latest_item['magnet_hash']
-                                    process_and_download_video(actor_data, latest_item, torrent_url)
-                                else:
-                                    logger_message(f"沒有找到 {current_date} 的項目")
-                            else:
-                                logger_message(f"未找到演員: {actor}")
-                    else:
-                        logger_message("未找到演員信息")
-                else:
-                    logger_message("未找到演員部分")
-            else:
-                logger_message("類別中包含 VR 或介紹影片，跳過處理。")
+        if video_info and 'actors' in video_info and 'classes' in video_info:
+            if 'VR' not in video_info['classes'] and '介紹影片' not in video_info['classes'] and '4小時以上作品' not in video_info['classes']:
+                for actor in video_info['actors']:
+                    actor_data = db_manager.get_pure_actor_by_dynamic_value('check_ch_name', actor) or db_manager.get_pure_actor_by_dynamic_value('check_jp_name', actor)
+                    if actor_data:
+                        today_items = video_info['magnet_links']
+                        today_items.sort(key=lambda x: x['time'], reverse=True)
+                        latest_item = today_items[0]
+                        renamed_file = rename_file_by_video_code(latest_item['name'], video_code)
+                        clean_name = clean_filename(renamed_file)
+                        process_and_download_video(actor_data, clean_name, latest_item['hash'])
+                        pass
     except Exception as e:
         logger_message(f'Error occurred: {e}')
 
 def download_javdb_url_link():
     url_links = [
         'https://javdb.com/censored?page={num}',
-        'https://javdb.com/censored?vft={num}'
     ]
     found_links = []
-
     for url_template in url_links:
         page = 1
-        if url_template =='https://javdb.com/censored?vft={num}':
-            page = 2
 
         max_pages = 10  # 增加最大頁數，以確保能找到"昨日新種"
         template_links = []
@@ -165,29 +128,19 @@ def download_javdb_url_link():
                                 video_code = video_code.text.strip()
                                 found_links.append((href, video_code))
                     template_links.append(url)
-                    #logger_message(f"檢查頁面: {url}")
 
                     if today_new_tags:
                         found_new = True
-                        #logger_message(f"在 {url} 找到'昨日新種'標籤")
                         break
                     
                     page += 1
                 else:
-                    #logger_message(f"頁面 {url} 請求失敗")
                     break
                 
             except Exception as e:
-                #logger_message(f'Error occurred on page {url}: {e}')
                 break
 
-        #if found_new:
-        #    found_links.extend(template_links)
-            #logger_message(f"將 {url_template} 的鏈接添加到 found_links")
-        #else:
-        #    logger_message(f"在 {url_template} 中未找到'昨日新種'標籤")
-
-    logger_message(f"找到的所有鏈接：{found_links}")
+    logger_message(f"找到的所有鏈接：{found_links} {template_links}")
     for link, code in found_links:
         download_video_link(link, code)
 
