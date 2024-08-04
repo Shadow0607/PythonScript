@@ -8,6 +8,7 @@ from config_reader import load_NAS_config, load_log_config
 from utils import split_string, clean_filename, db_manager
 from javdb_scraper import JavdbScraper
 from actor_models import create_video_from_dict
+from movefile_v2 import delete_files_with_string
 config = load_NAS_config()
 config_log = load_log_config()
 scraper = JavdbScraper()
@@ -27,6 +28,7 @@ def insert_av_video(id, file_name,magnet):
             if existing_video.magnet!=magnet and magnet!='N':
                 if new_priority > existing_priority:
                     result = db_manager.update_av_video(video_num, id, category)
+                    delete_files_with_string(video_num)
                 else:
                     logger_message(f"Cannot update '{video_num}'. New category '{category}' does not have higher priority than existing '{existing_video.category}'.")
                     result =2
