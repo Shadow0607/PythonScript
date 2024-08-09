@@ -8,6 +8,11 @@ from config_reader import load_NAS_config, load_log_config
 from logger import log
 from database_manager import DatabaseManager
 import platform
+from javdb_scraper import JavdbScraper
+from actor_models import create_video_from_dict
+from movefile_v2 import delete_files_with_string
+
+scraper = JavdbScraper()
 
 config = load_NAS_config()
 config_log = load_log_config()
@@ -19,6 +24,29 @@ def logger_message(message):
 def insert_av_video(id, path):
     video_num, category = split_string(path)
     result = db_manager.insert_av_video(id, video_num, category)
+    return result
+
+def insert_av_video(id, file_name):
+    video_num, category = split_string(file_name)
+    result =0
+    try:
+        check_result = db_manager.check_and_update_video(id, video_num, category)
+        if check_result:
+            existing_video = create_video_from_dict(check_result) 
+            new_priority = db_manager.get_category_priority(category)
+            existing_priority = db_manager.get_category_priority(existing_video.category)
+
+            if new_priority > existing_priority:
+                result = db_manager.update_av_video(video_num, id, category)
+                #delete_files_with_string(video_num)
+            else:
+                logger_message(f"Cannot update '{video_num}'. New category '{category}' does not have higher priority than existing '{existing_video.category}'.")
+                result =2
+        else:
+            result = db_manager.insert_av_video(id, video_num, category)
+    except Exception as e:
+        logger_message(f"Exception :{e}")
+        result =0
     return result
 
 def download_image(img_url, dir_name, file_name_without_ext):
@@ -44,32 +72,13 @@ def download_jpg(jpg_name):
 
     parts = video_num.split('-')
     result = '-'.join(parts[:2])
-    url = f'https://javdb.com/search?q={result}&f=all'
+
     try:
-        response = requests.get(url)
-        logger_message(f'URL requested: {url}')
-        logger_message(f'路徑: {dir_name}/{result}')
-        response.raise_for_status()
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            video_divs = soup.find_all('div', class_='video-title')
-            for video_div in video_divs:
-                strong_tag = video_div.find('strong')
-                if strong_tag and strong_tag.text.strip() == result:
-                    cover_div = video_div.find_previous('div', class_='cover')
-                    if cover_div:
-                        img_tag = cover_div.find('img', {'loading': 'lazy'})
-                        if img_tag and 'src' in img_tag.attrs:
-                            img_url = img_tag['src']
-                            logger_message(f'Image URL: {img_url}')
-                            logger_message(f'{file_name_without_ext}.jpg')
-                            download_image(img_url, dir_name, file_name_without_ext)
-                            return
-            logger_message('Image tag not found or no matching video found.')
-            time.sleep(5)
+        img_url = scraper.get_image_url(result)
+        if img_url:
+            download_image(img_url, dir_name, file_name_without_ext)
         else:
-            logger_message(f'Failed to retrieve the webpage. Status code: {response.status_code}')
-            time.sleep(5)
+            logger_message('Image not found.')
     except Exception as e:
         logger_message(f'Error occurred: {e}')
     time.sleep(10)
@@ -92,7 +101,7 @@ def get_download_list():
                 id = actor_data['id']
             else:
                 id = 0  # or handle this case as appropriate
-            logger_message(parent_path)
+            video_data = db_manager.get_pure_video_by_dynamic_value('check_actor_id', id)
             if system != 'Linux':
                 parent_path = parent_path.replace('/volume1/video/','Y:\\\\')
             all_files = os.listdir(parent_path)
@@ -100,38 +109,43 @@ def get_download_list():
                 continue
             
             base_names = set(os.path.splitext(f)[0] for f in all_files if not f.lower().endswith('.jpg'))
-            
+            video_data_set = preprocess_video_data(video_data)
             for base_name in base_names:
                 new_filename = clean_filename(base_name)
                 video_num, category = split_string(new_filename)
                 if base_name == "SYNOVIDEO_VIDEO_SCREENSHOT":
                     continue
-                
+                video_result =check_video_num_exists(video_data_set, id, video_num, category)
+
                 mp4_exists = any(f.lower() == f"{base_name}.mp4".lower() for f in all_files)
                 jpg_exists = any(f.lower() == f"{base_name}.jpg".lower() for f in all_files)
                 
-                mp4_path = os.path.join(parent_path, f"{base_name}.mp4")
                 jpg_path = os.path.join(parent_path, f"{base_name}.jpg")
                 result =0
-                if mp4_exists and not jpg_exists:
-                    if id != 0:
-                        result = insert_av_video(id, base_name)
-                    download_jpg(jpg_path)
-                    logger_message(f"Downloaded JPG for: {base_name}")
-                
-                elif jpg_exists and not mp4_exists:
+                if mp4_exists:
+                    if not jpg_exists:
+                        if id != 0 and not video_result:
+                            result = insert_av_video(id, base_name)
+                        download_jpg(jpg_path)
+                        logger_message(f"Downloaded JPG for: {base_name}")
+                    else:
+                        if id != 0 and not video_result:
+                            result = insert_av_video(id, base_name)
+                elif jpg_exists:
                     os.remove(jpg_path)
                     logger_message(f"Deleted JPG without MP4: {jpg_path}")
-                
-                elif mp4_exists and jpg_exists:
-                    if id != 0 and result==0:
-                        result = insert_av_video(id, base_name)
                     #logger_message(f"Both MP4 and JPG exist for: {base_name}")
                 
         
     if system != 'Linux':
         delete_NAS_connect()
 
+def check_video_num_exists(video_data_set, actor_id, target_video_num, target_category):
+    return (actor_id, target_video_num.lower(), target_category.lower()) in video_data_set
+
+def preprocess_video_data(video_data):
+    return {(video['actor_id'], video['video_num'].lower(), video['category'].lower()) 
+            for video in video_data}
 
 if __name__ == "__main__":
     get_download_list()
