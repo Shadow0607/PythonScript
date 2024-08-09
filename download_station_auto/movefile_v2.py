@@ -257,9 +257,9 @@ def delete_files_with_string(target_string):
                     file_path = os.path.join(dirpath, filename)
                     try:
                         os.remove(file_path)
-                        print(f"已刪除: {file_path}")
+                        logger_message(f"已刪除: {file_path}")
                     except Exception as e:
-                        print(f"無法刪除 {file_path}: {e}")
+                        logger_message(f"無法刪除 {file_path}: {e}")
         if system != 'Linux':
             delete_NAS_connect()
     except Exception as e:

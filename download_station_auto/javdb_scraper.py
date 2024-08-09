@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import time
 from logger import log
 from config_reader import load_log_config
-
+from requests.exceptions import RequestException
 config_log = load_log_config()
 
 class JavdbScraper:
@@ -15,14 +15,20 @@ class JavdbScraper:
     def logger_message(self, message):
         log(message, config_log['LOG_FOLDER'], 'javdb_scraper')
 
-    def get_soup(self, url):
-        try:
-            response = self.session.get(url)
-            response.raise_for_status()
-            return BeautifulSoup(response.content, 'html.parser')
-        except Exception as e:
-            self.logger_message(f'Error occurred while fetching {url}: {e}')
-            return None
+    def get_soup(self, url, max_retries=3, delay=5):
+        for attempt in range(max_retries):
+            try:
+                response = self.session.get(url)
+                response.raise_for_status()
+                return BeautifulSoup(response.content, 'html.parser')
+            except RequestException as e:
+                self.logger_message(f'Error occurred while fetching {url}: {e}')
+                if attempt < max_retries - 1:
+                    self.logger_message(f'Retrying in {delay} seconds...')
+                    time.sleep(delay)
+                else:
+                    self.logger_message('Max retries reached. Giving up.')
+                    return None
 
     def search_video(self, video_num):
         url = f'{self.BASE_URL}/search?q={video_num}&f=all'
