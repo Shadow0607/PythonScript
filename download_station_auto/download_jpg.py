@@ -105,7 +105,7 @@ def get_download_list():
             if system != 'Linux':
                 parent_path = parent_path.replace('/volume1/video/','Y:\\\\')
             all_files = os.listdir(parent_path)
-            if "@eaDir" in parent_path:
+            if "@eaDir" in parent_path or "cartoon" in parent_path:
                 continue
             
             base_names = set(os.path.splitext(f)[0] for f in all_files if not f.lower().endswith('.jpg'))

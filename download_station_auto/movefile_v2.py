@@ -27,7 +27,7 @@ def get_recent_files(dir_path: str) -> Generator[str, None, None]:
     current_time = time.time()
     delete_mp4 =["台 妹 子 線 上 現 場 直 播 各 式 花 式 表 演.mp4","社 區 最 新 情 報.mp4"]
     for root, _, files in os.walk(dir_path):
-        if "@eaDir" in root:
+        if "@eaDir" in root or "cartoon" in root:
             continue
         for file in files:
             if file == "SYNOVIDEO_VIDEO_SCREENSHOT.jpg":
@@ -112,6 +112,8 @@ def process_files():
 
 def get_database_root_path(dir_path):
     linux_path = dir_path.replace('Y:', '/volume1/video/').replace('\\', '/')
+    if "待分類" in linux_path:
+        linux_path = linux_path.rsplit('/', 1)[0]
     linux_path = normalize_path(linux_path)
     return db_manager.get_pure_actor_by_dynamic_value('check_actor_path', linux_path)
 
@@ -172,10 +174,11 @@ def rename_files():
     for file_path in get_recent_files(VIDEO_DIR):
         directory, full_filename = os.path.split(file_path)
         filename, file_extension = os.path.splitext(full_filename)
-        
         dir_path = normalize_path(directory)
         database_root_path = get_database_root_path(dir_path)
-
+        if "待分類" in directory:
+            directory = directory.replace('Y:', '/volume1/video/').replace('\\', '/')
+            directory = directory.rsplit('/', 1)[0]
         last_folder = os.path.basename(directory)
         if database_root_path and last_folder == os.path.basename(database_root_path['path']):
             handle_database_root_file(file_path, filename, database_root_path,file_extension)
@@ -273,6 +276,7 @@ def normalize_path(path):
     path = os.path.normpath(path)
     # 確保使用正斜線（為了統一性）
     path = path.replace('\\', '/')
+
     return path
 
 if __name__ == "__main__":
