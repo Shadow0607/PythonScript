@@ -160,8 +160,8 @@ def main():
 
     # 測試頻道的URL
     channel_urls = [
-        'https://www.youtube.com/@cheng.han_ayoung/shorts',
-        'https://www.youtube.com/@cheng.han_ayoung/videos'
+        'https://www.youtube.com/123/shorts',
+        'https://www.youtube.com/123/videos'
     ]
 
     ydl_opts_download = {
