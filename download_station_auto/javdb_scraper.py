@@ -15,7 +15,7 @@ class JavdbScraper:
     def logger_message(self, message):
         log(message, config_log['LOG_FOLDER'], 'javdb_scraper')
 
-    def get_soup(self, url, max_retries=3, delay=5):
+    def get_soup(self, url, max_retries=3, delay=20):
         for attempt in range(max_retries):
             try:
                 response = self.session.get(url)

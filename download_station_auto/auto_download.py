@@ -84,8 +84,17 @@ def process_and_download_video(actor_data, latest_item, torrent_url):
 def download_video_link(link, video_code):
     video_info = scraper.get_video_info(link)
     try:
+        excluded_classes = [
+            'VR',
+            '介紹影片',
+            '女同性戀',
+            '女裝人妖',
+            '變性者','跳舞','雙性人'
+        ]
+        
         if video_info and 'actors' in video_info and 'classes' in video_info:
-            if 'VR' not in video_info['classes'] and '介紹影片' not in video_info['classes'] and not any('小時以上作品' in class_name for class_name in video_info['classes']) and '女同性戀' not in video_info['classes']:
+            if (all(cls not in video_info['classes'] for cls in excluded_classes) and
+                not any('小時以上作品' in class_name for class_name in video_info['classes'])):
                 for actor in video_info['actors']:
                     actor_data = db_manager.get_pure_actor_by_dynamic_value('check_ch_name', actor) or db_manager.get_pure_actor_by_dynamic_value('check_jp_name', actor)
                     if actor_data:
@@ -101,11 +110,15 @@ def download_video_link(link, video_code):
 
 def download_javdb_url_link():
     url_links = [
-        'https://javdb.com/censored?page={num}'
+        'https://javdb.com/censored?page={num}'#,
+        #'https://javdb.com/censored?vft={num}'
     ]
     found_links = []
     for url_template in url_links:
         page = 1
+
+        #if url_template =='https://javdb.com/censored?vft={num}':
+        #    page =2
 
         max_pages = 10  # 增加最大頁數，以確保能找到"昨日新種"
         template_links = []

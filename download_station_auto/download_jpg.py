@@ -21,11 +21,6 @@ db_manager = DatabaseManager()
 def logger_message(message):
     log(message, config_log['LOG_FOLDER'], 'download_jpg')
 
-def insert_av_video(id, path):
-    video_num, category = split_string(path)
-    result = db_manager.insert_av_video(id, video_num, category)
-    return result
-
 def insert_av_video(id, file_name):
     video_num, category = split_string(file_name)
     result =0
@@ -40,7 +35,7 @@ def insert_av_video(id, file_name):
                 result = db_manager.update_av_video(video_num, id, category)
                 #delete_files_with_string(video_num)
             else:
-                logger_message(f"Cannot update '{video_num}'. New category '{category}' does not have higher priority than existing '{existing_video.category}'.")
+                logger_message(f"'{file_name}' Cannot update '{video_num}'. New category '{category}' does not have higher priority than existing '{existing_video.category}'.")
                 result =2
         else:
             result = db_manager.insert_av_video(id, video_num, category)

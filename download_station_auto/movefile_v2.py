@@ -25,7 +25,7 @@ def logger_message(message):
 
 def get_recent_files(dir_path: str) -> Generator[str, None, None]:
     current_time = time.time()
-    delete_mp4 =["台 妹 子 線 上 現 場 直 播 各 式 花 式 表 演.mp4","社 區 最 新 情 報.mp4"]
+    delete_mp4 =["台 妹 子 線 上 現 場 直 播 各 式 花 式 表 演.mp4","社 區 最 新 情 報.mp4","苍 老 师 强 力 推 荐.mp4"]
     for root, _, files in os.walk(dir_path):
         if "@eaDir" in root or "cartoon" in root:
             continue
@@ -112,8 +112,13 @@ def process_files():
 
 def get_database_root_path(dir_path):
     linux_path = dir_path.replace('Y:', '/volume1/video/').replace('\\', '/')
+    
     if "待分類" in linux_path:
-        linux_path = linux_path.rsplit('/', 1)[0]
+        # 檢查"待分類"後是否還有下一層資料夾
+        parts = linux_path.split('/')
+        if "待分類" in parts and parts.index("待分類") < len(parts) - 1:
+            linux_path = '/'.join(parts[:parts.index("待分類") + 1])
+    
     linux_path = normalize_path(linux_path)
     return db_manager.get_pure_actor_by_dynamic_value('check_actor_path', linux_path)
 
@@ -131,7 +136,7 @@ def process_recent_file(file_path, filename, file_extension, database_root_path)
         return
 
     video_num, category = split_string(new_filename)
-    path = db_manager.get_actor_by_video_num(video_num) or get_video_num_actor_link(video_num)
+    path = db_manager.get_actor_by_video_num(video_num) or get_video_num_actor_link(video_num) or db_manager.get_pure_actor_by_dynamic_value('check_ch_name', 'other')
 
     if path:
         result =insert_av_video(path['id'], new_filename, 'N')
@@ -152,8 +157,8 @@ def handle_database_root_file(file_path, filename, database_root_path,file_exten
     new_filename = clean_filename(filename)
     video_num, category = split_string(new_filename)
     logger_message(f"video_num:{video_num}")   
-    path = get_video_num_actor_link(video_num) or db_manager.get_actor_by_video_num(video_num)
-    #logger_message(f"path:{path}")  
+    path = get_video_num_actor_link(video_num) or db_manager.get_actor_by_video_num(video_num) or db_manager.get_pure_actor_by_dynamic_value('check_ch_name', 'other')
+    logger_message(f"path:{path}")  
     new_filename_directory=path['path']
     #logger_message(f"new_filename_directory:{new_filename_directory}，filename:{filename}")    
     if path and path != os.path.basename(database_root_path['path']):
