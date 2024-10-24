@@ -8,7 +8,7 @@ PASSWORD = '132'  # 请替换为您的 Instagram 密码
 
 
 # 用户名列表
-usernames = ['tanbowgo', 'yyyoungggggg','yoona__lim'] 
+usernames = ['123', '12','1'] 
 
 # 置顶帖子 shortcodes 列表，手动管理
 pinned_posts_shortcodes = ['CyuHEuByfGC', 'C5Cx99XyY9y','Cf3TbJKPQbv','DA1Q00bysBX']
